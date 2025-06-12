@@ -377,3 +377,26 @@ admin 模块：
 
 ![](images/16.png)
 
+# 二、Spring Boot多环境配置
+
+## 2.1、新建yml配置文件
+
+![](images/17.png)
+
+## 2.2、默认激活dev环境
+
+修改 `application.yml`文件：
+
+```yml
+spring:
+  profiles:
+    # 默认激活 dev 环境
+    active: dev
+```
+
+## 2.3、验证是否生效
+
+启动项目：
+
+![](images/18.png)
+
