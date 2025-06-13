@@ -400,3 +400,125 @@ spring:
 
 ![](images/18.png)
 
+#  三、整合Logback日志
+
+## 3.1、引入依赖
+
+由于 Spring Boot 默认使用 Logback，所以当你在 `pom.xml` 中加入 `spring-boot-starter-web` 依赖时，它会自动包含 Logback 相关依赖，无需额外添加 Logback 依赖。编辑 `weblog-web` 入口模块的 `pom.xml`, 添加如下依赖：
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+```
+
+## 3.2、自定义Logback配置
+
+在`weblog-web`模块的`src/main/resources`目录下，创建一个`logback-weblog.xml`文件
+
+文件内容如下：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration >
+    <jmxConfigurator />
+    <include resource="org/springframework/boot/logging/logback/defaults.xml" />
+
+    <!-- 应用名称 -->
+    <property scope="context" name="appName" value="weblog" />
+    <!-- 自定义日志输出路径及日志前缀 -->
+    <!-- 输出到控制台 -->
+    <property name="LOG_FILE" value="/app/weblog/logs/${appName}.%d{yyyy-MM-dd}" />
+    <!-- 输出到文件 -->
+    <!-- <property name="LOG_FILE" value="D:\\GitRepository\\Projects\\Blog\\Back\\weblog-springboot\\logs\\${appName}.%d{yyyy-MM-dd}" /> -->
+    <property name="FILE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n" />
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- 日志文件输出的文件名 -->
+            <FileNamePattern>${LOG_FILE}-%i.log</FileNamePattern>
+            <!-- 日志文件保留天数 -->
+            <MaxHistory>30</MaxHistory>
+            <!-- 日志文件最大的大小 -->
+            <TimeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>10MB</maxFileSize>
+            </TimeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <!-- 格式化输出：%d 表示日期，%thread 表示线程名，%-5level：级别从左显示 5 个字符宽度 %errorMessage：日志消息，%n 是换行符-->
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- dev 环境（仅输出到控制台） -->
+    <springProfile name="dev">
+        <include resource="org/springframework/boot/logging/logback/console-appender.xml" />
+        <root level="info">
+            <appender-ref ref="CONSOLE" />
+        </root>
+    </springProfile>
+
+    <!-- prod 环境（仅输出到文件中） -->
+    <springProfile name="prod">
+        <include resource="org/springframework/boot/logging/logback/console-appender.xml" />
+        <root level="INFO">
+            <appender-ref ref="FILE" />
+        </root>
+    </springProfile>
+</configuration>
+```
+
+## 3.3、测试
+
+在测试类`WeblogWebApplicationTests`中新建一个测试方法：
+
+```java
+package com.cm.weblog.web;
+
+import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+@Slf4j
+class WeblogWebApplicationTests {
+
+    @Test
+    void contextLoads() {
+    }
+
+    @Test
+    void testLog() {
+        log.info("这是一行 Info 级别日志");
+        log.warn("这是一行 Warn 级别日志");
+        log.error("这是一行 Error 级别日志");
+
+        // 占位符
+        String author = "CM";
+        log.info("这是一行带有占位符日志，作者：{}", author);
+    }
+
+}
+```
+
+### 3.3.1、控制台打印
+
+> `dev` 环境
+
+修改logback-weblog.xml中的LOG_FILE路径
+
+```xml
+<property name="LOG_FILE" value="/app/weblog/logs/${appName}.%d{yyyy-MM-dd}" />
+```
+
+### 3.3.2、输出到文件
+
+> `prod` 环境
+
+修改logback-weblog.xml中的LOG_FILE路径
+
+```xml
+<property name="LOG_FILE" value="D:\\GitRepository\\Projects\\Blog\\Back\\weblog-springboot\\logs\\${appName}.%d{yyyy-MM-dd}" />
+```
+
