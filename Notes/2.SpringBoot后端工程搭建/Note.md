@@ -969,3 +969,361 @@ public class TestController {
 ```
 
 # 七、自定义响应工具类
+
+## 7.1、设计响应模型
+
+**成功响应**
+
+```json
+{
+    "success": true,
+    "message": null,
+    "errorCode": null,
+    "data": null
+}
+```
+
+**失败响应**
+
+```json
+{
+    "success": false,
+    "message": "errorMessage",
+    "errorCode": "errorCode",
+    "data": null
+}
+```
+
+## 7.2、自定义响应工具类
+
+代码如下：
+
+```java
+package com.cm.weblog.common.utils;
+
+import lombok.Data;
+
+import java.io.Serializable;
+
+/**
+ * 响应参数工具类
+ */
+@Data
+public class Response<T> implements Serializable {
+    private boolean success = true;
+    private String message;
+    private String errorCode;
+    private T data;
+
+    /*
+    * 成功响应
+    * */
+    public static <T> Response<T> success() {
+        return new Response<>();
+    }
+
+    public static <T> Response<T> success(T data) {
+        Response<T> response = new Response<>();
+        response.setSuccess(true);
+        response.setData(data);
+        return response;
+    }
+
+    /*
+    * 失败响应
+    * */
+    public static <T> Response<T> fail() {
+        Response<T> response = new Response<>();
+        response.setSuccess(false);
+        return response;
+    }
+
+    public static <T> Response<T> fail(String message) {
+        Response<T> response = new Response<>();
+        response.setSuccess(false);
+        response.setMessage(message);
+        return response;
+    }
+
+    public static <T> Response<T> fail(String code, String message) {
+        Response<T> response = new Response<>();
+        response.setSuccess(false);
+        response.setErrorCode(code);
+        response.setMessage(message);
+        return response;
+    }
+}
+```
+
+## 7.3、在控制器中使用
+
+重写前面小节中 `TestController` 中 `/test` 接口的返参：
+
+```java
+@PostMapping("/test")
+@ApiOperationLog(description = "测试接口")
+public Response<?> test(@RequestBody @Validated User user, BindingResult bindingResult) {
+	if (bindingResult.hasErrors()) {
+		String errorMsg = bindingResult.getFieldErrors()
+				.stream()
+				.map(FieldError::getDefaultMessage)
+				.collect(Collectors.joining(", "));
+
+		return Response.fail(errorMsg);
+	}
+
+	return Response.success();
+}
+```
+
+## 7.4、测试结果
+
+请求`/test`得到如下结果
+
+**入参：**
+
+```json
+{
+    "username": "cm",
+    "sex": 1,
+    "age": 32,
+    "email": "123124@qq.com"
+}
+```
+
+**成功响应：**
+
+```json
+{
+    "success": true,
+    "message": null,
+    "errorCode": null,
+    "data": null
+}
+```
+
+**入参：**
+
+```json
+{
+    "username": "",
+    "sex": null,
+    "age": 120,
+    "email": "123124qq.com"
+}
+```
+
+**失败响应：**
+
+```json
+{
+    "success": false,
+    "message": "性别不能为空, 邮箱格式不正确, 用户名不能为空, 年龄必须在18-100岁之间",
+    "errorCode": null,
+    "data": null
+}
+```
+
+# 八、全局异常管理
+
+## 8.1、自定义异常基础接口
+
+在 `weblog-module-common` 模块中新建 `exception` 包，用于统一放置和异常相关的代码。然后，创建一个 `BaseExceptionInterface` 基础异常接口：
+
+```java
+package com.cm.weblog.common.exception;
+
+/**
+ * 通用异常接口
+ */
+public interface BaseExceptionInterface {
+    String getErrorCode();
+    String getErrorMessage();
+}
+```
+
+## 8.2、自定义错误码枚举
+
+新建 `enums` 包，用于统一放置枚举类，在该包中，创建 `ResponseCodeEnum` 异常码枚举类，代码如下：
+
+```java
+package com.cm.weblog.common.enums;
+
+import com.cm.weblog.common.exception.BaseExceptionInterface;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+/**
+ * 响应异常码枚举
+ */
+@Getter
+@AllArgsConstructor
+public enum ResponseCodeEnum implements BaseExceptionInterface {
+    // ----------- 通用异常状态码 -----------
+    SYSTEM_ERROR("10000", "出错啦，后台小哥正在努力修复中..."),
+
+    // ----------- 业务异常状态码 -----------
+    PRODUCT_NOT_FOUND("20000", "该产品不存在（测试使用）"),
+    ;
+
+    private final String errorCode;
+    private final String errorMessage;
+}
+```
+
+## 8.3、自定义业务异常
+
+在 `weblog-module-common` 模块的 `exception` 包创建 `BizException`：
+
+```java
+package com.cm.weblog.common.exception;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class BizException extends RuntimeException {
+    private String errorCode;
+    private String errorMessage;
+
+    public BizException(BaseExceptionInterface baseExceptionInterface) {
+        this.errorCode = baseExceptionInterface.getErrorCode();
+        this.errorMessage = baseExceptionInterface.getErrorMessage();
+    }
+}
+```
+
+## 8.4、捕获应用中抛出的所有异常
+
+### 8.4.1、添加依赖
+
+在 `weblog-module-common` 模块中的 `pom.xml` 中添加如下依赖，因为 `@ControllerAdvice` 注解在这个依赖中：
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+```
+
+### 8.4.2、拓展响应工具类
+
+在 `Response` 响应工具类中，添加两个新的方法：
+
+```java
+public static <T> Response<T> fail(BizException bizException) {
+	Response<T> response = new Response<>();
+	response.setSuccess(false);
+	response.setMessage(bizException.getErrorMessage());
+	response.setErrorCode(bizException.getErrorCode());
+	return response;
+}
+
+public static <T> Response<T> fail(BaseExceptionInterface baseExceptionInterface) {
+	Response<T> response = new Response<>();
+	response.setSuccess(false);
+	response.setMessage(baseExceptionInterface.getErrorMessage());
+	response.setErrorCode(baseExceptionInterface.getErrorCode());
+	return response;
+}
+```
+
+### 8.4.3、创建全局异常处理类
+
+在 `exception` 包下，创建全局异常处理类 `GlobalExceptionHandler` 
+
+```java
+package com.cm.weblog.common.exception;
+
+import com.cm.weblog.common.enums.ResponseCodeEnum;
+import com.cm.weblog.common.utils.Response;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import javax.servlet.http.HttpServletRequest;
+
+/**
+ * 全局异常处理
+ */
+@ControllerAdvice
+@Slf4j
+public class GlobalExceptionHandler {
+    /*
+    * 业务异常
+    * */
+    @ExceptionHandler({ BizException.class })
+    @ResponseBody
+    public Response<Object> handleBizException(HttpServletRequest request, BizException e) {
+        log.warn("{} request fail, errorCode: {}, errorMessage: {}", request.getRequestURI(), e.getErrorCode(), e.getErrorMessage());
+        return Response.fail(e);
+    }
+
+    /*
+     * 其它异常
+     * */
+    @ExceptionHandler({ Exception.class })
+    @ResponseBody
+    public Response<Object> handleException(HttpServletRequest request, Exception e) {
+        log.error("{} request error, ", request.getRequestURI(), e);
+        return Response.fail(ResponseCodeEnum.SYSTEM_ERROR);
+    }
+}
+
+```
+
+> 上述代码中，通过 `@ControllerAdvice` 注解将 `GlobalExceptionHandler` 声明为了全局异常处理类。在其中，定义了一个 `handleBizException()` 方法，并通过 `@ExceptionHandler` 注解指定只捕获 `BizException` 自定义业务异常。然后，打印了相关错误日志，并组合了统一的响应格式返回。
+
+## 8.5、测试
+
+**业务异常**
+
+修改`TestController`中的`/test`接口，手动抛出一个自定义业务异常
+
+```java
+@PostMapping("/test")
+@ApiOperationLog(description = "测试接口")
+public Response<?> test(@RequestBody @Validated User user, BindingResult bindingResult) {
+	// 手动抛异常，入参是前面定义好的异常码枚举，返参统一交给全局异常处理器搞定
+	throw new BizException(ResponseCodeEnum.PRODUCT_NOT_FOUND);
+}
+```
+
+重启项目，用 Postman 请求一下 `/test` 接口，看下效果：
+
+```json
+{
+    "success": false,
+    "message": "该产品不存在（测试使用）",
+    "errorCode": "20000",
+    "data": null
+}
+```
+
+**其他异常**
+
+修改`TestController`中的`/test`接口，手动抛出一个运行时异常
+
+```java
+@PostMapping("/test")
+@ApiOperationLog(description = "测试接口")
+public Response<?> test(@RequestBody @Validated User user, BindingResult bindingResult) {
+	// 主动定义一个运行时异常，分母不能为零
+	int i = 1 / 0;
+	return Response.success();
+}
+```
+
+重启项目，用 Postman 请求一下 `/test` 接口，看下效果：
+
+```json
+{
+    "success": false,
+    "message": "出错啦，后台小哥正在努力修复中...",
+    "errorCode": "10000",
+    "data": null
+}
+```
+
