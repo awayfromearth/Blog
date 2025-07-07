@@ -1327,3 +1327,288 @@ public Response<?> test(@RequestBody @Validated User user, BindingResult binding
 }
 ```
 
+# 九、拓展全局异常管理参数校验异常
+
+## 9.1、新增参数异常枚举
+
+```java
+public enum ResponseCodeEnum implements BaseExceptionInterface {
+
+    // ----------- 通用异常状态码 -----------
+	...省略
+    PARAM_NOT_VALID("10001", "参数错误"),
+
+
+	...省略
+}
+```
+
+## 9.2、自定义全局异常管理类捕获参数校验异常
+
+改造 `GlobalExceptionHandler` 类，添加 `handleMethodArgumentNotValidException()` 方法，代码如下：
+
+```java
+/*
+* 参数校验异常
+* */
+@ExceptionHandler({ MethodArgumentNotValidException.class })
+@ResponseBody
+public Response<Object> handleMethodArgumentNotValidException(HttpServletRequest request, MethodArgumentNotValidException e) {
+	String errorCode = ResponseCodeEnum.PARAM_NOT_VALID.getErrorCode();
+
+	BindingResult bindingResult = e.getBindingResult();
+
+	StringBuilder sb = new StringBuilder();
+	// 获取校验不通过的字段，并组合错误信息，格式为： email 邮箱格式不正确, 当前值: '123124qq.com'
+	Optional.of(bindingResult.getFieldErrors()).ifPresent(errors -> {
+		errors.forEach(error ->
+			sb.append(error.getField())
+				.append(" ")
+				.append(error.getDefaultMessage())
+				.append(", 当前值：‘")
+				.append(error.getRejectedValue())
+				.append("’；")
+		);
+	});
+
+	String errorMessage = sb.toString();
+
+	log.warn("{} request error, errorCode: {}, errorMessage: {}", request.getRequestURI(), errorCode, errorMessage);
+
+	return Response.fail(errorCode, errorMessage);
+}
+```
+
+## 9.3、测试
+
+修改 `TestController` 中的 `/test` 接口，记住不要添加参数 `BindingResult`, 将 `MethodArgumentNotValidException` 异常统一抛给全局异常管理器来处理：
+
+```java
+@PostMapping("/test")
+@ApiOperationLog(description = "测试接口")
+public Response test(@RequestBody @Validated User user) {
+	return Response.success();
+}
+```
+
+重启项目，通过 Postman 调用 `/test` 接口，看看返参效果：
+
+入参：
+
+```json
+{
+    "username": "",
+    "sex": null,
+    "age": 126,
+    "email": "1233124qq.com"
+}
+```
+
+反参：
+
+```json
+{
+    "success": false,
+    "message": "username 用户名不能为空, 当前值：‘’；sex 性别不能为空, 当前值：‘null’；email 邮箱格式不正确, 当前值：‘1233124qq.com’；age 年龄必须在18-100岁之间, 当前值：‘126’；",
+    "errorCode": "10001",
+    "data": null
+}
+```
+
+# 十、Knife4j构建Api文档
+
+## 10.1、添加依赖
+
+在父项目 `weblog-springboot` 中的 `pom.xml` 文件中，添加 Knife4j 依赖版本号：
+
+```xml
+<!-- 版本号统一管理 -->
+<properties>
+
+	<!-- 依赖包版本 -->
+	省略...        
+	<knife4j.version>4.3.0</knife4j.version>
+</properties>
+
+<!-- 统一依赖管理 -->
+<dependencyManagement>
+	<dependencies>
+	省略...        
+
+		<!-- knife4j（API 文档工具） -->
+		<dependency>
+			<groupId>com.github.xiaoymin</groupId>
+			<artifactId>knife4j-openapi2-spring-boot-starter</artifactId>
+			<version>${knife4j.version}</version>
+		</dependency>
+
+	</dependencies>
+</dependencyManagement>
+```
+
+在 `weblog-web` 和 `weblog-module-admin` 两个模块中，引入该依赖：
+
+```xml
+<!-- knife4j -->
+<dependency>
+	<groupId>com.github.xiaoymin</groupId>
+	<artifactId>knife4j-openapi2-spring-boot-starter</artifactId>
+</dependency>
+```
+
+## 10.2、添加配置类
+
+在 `weblog-web` 模块中添加包 `config` , 用于统一放置配置类。在该包下新建名为 `Knife4jConfig` 配置类：
+
+```java
+package com.cm.weblog.web.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import springfox.documentation.builders.ApiInfoBuilder;
+import springfox.documentation.builders.PathSelectors;
+import springfox.documentation.builders.RequestHandlerSelectors;
+import springfox.documentation.service.ApiInfo;
+import springfox.documentation.service.Contact;
+import springfox.documentation.spi.DocumentationType;
+import springfox.documentation.spring.web.plugins.Docket;
+import springfox.documentation.swagger2.annotations.EnableSwagger2WebMvc;
+
+@Configuration
+@EnableSwagger2WebMvc
+@Profile("dev")
+public class Knife4jConfig {
+    @Bean("webApi")
+    public Docket createApiDoc() {
+        return new Docket(DocumentationType.SWAGGER_2)
+                .apiInfo(buildApiInfo())
+                .groupName("Web 前台接口")
+                .select()
+                .apis(RequestHandlerSelectors.basePackage("com.cm.weblog.web.controller"))
+                .paths(PathSelectors.any())
+                .build();
+    }
+
+    private ApiInfo buildApiInfo() {
+        return new ApiInfoBuilder()
+                .title("Weblog 博客前台接口文档")
+                .description("Weblog 是一款由 Spring Boot + Vue 3.2 + Vite 4.3 开发的前后端分离博客。")
+                .termsOfServiceUrl("")
+                .contact(new Contact("cm", "", "email@test.com"))
+                .version("1.0")
+                .build();
+    }
+}
+```
+
+在 `weblog-module-admin` 模块中添加包 `config` , 用于统一放置配置类。在该包下新建名为 `Knife4jAdminConfig` 配置类：
+
+```java
+package com.cm.weblog.admin.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import springfox.documentation.builders.ApiInfoBuilder;
+import springfox.documentation.builders.PathSelectors;
+import springfox.documentation.builders.RequestHandlerSelectors;
+import springfox.documentation.service.ApiInfo;
+import springfox.documentation.service.Contact;
+import springfox.documentation.spi.DocumentationType;
+import springfox.documentation.spring.web.plugins.Docket;
+import springfox.documentation.swagger2.annotations.EnableSwagger2WebMvc;
+
+@Configuration
+@EnableSwagger2WebMvc
+@Profile("dev")
+public class Knife4jAdminConfig {
+    @Bean("adminApi")
+    public Docket createApiDoc() {
+        return new Docket(DocumentationType.SWAGGER_2)
+                .apiInfo(buildApiInfo())
+                .groupName("Admin 后台接口")
+                .select()
+                .apis(RequestHandlerSelectors.basePackage("com.cm.weblog.admin.controller"))
+                .paths(PathSelectors.any())
+                .build();
+    }
+
+    private ApiInfo buildApiInfo() {
+        return new ApiInfoBuilder()
+                .title("Weblog 博客 Admin 后台接口文档")
+                .description("Weblog 是一款由 Spring Boot + Vue 3.2 + Vite 4.3 开发的前后端分离博客。")
+                .termsOfServiceUrl("")
+                .contact(new Contact("cm", "", "email@test.com"))
+                .version("1.0")
+                .build();
+    }
+}
+```
+
+> @Profile注解指定Knife4j仅在开发环境生效
+
+## 10.3、添加接口描述
+
+给Controller添加Swagger相关注解
+
+```java
+@RestController
+@Slf4j
+@Api(tags = "首页模块") // 模块名称
+public class TestController {
+    @PostMapping("/test")
+    @ApiOperationLog(description = "测试接口")
+    @ApiOperation(value = "测试接口") // 接口名称
+    public Response<?> test(@RequestBody @Validated User user) {
+        return Response.success();
+    }
+}
+```
+
+- `@Api` : 此注解作用于 `controller` 之上，用于描述相关职责；
+- `@ApiOperation` : 此注解作用于接口上，用于描述接口干啥的；
+
+## 10.4、添加类描述及字段描述
+
+给Model添加Swagger相关注解
+
+```java
+package com.cm.weblog.web.model;
+
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
+
+import javax.validation.constraints.*;
+
+@Data
+@ApiModel(value = "用户实体类")
+public class User {
+    @NotBlank(message = "用户名不能为空")
+    @ApiModelProperty(value = "用户名")
+    private String username;
+
+    @NotNull(message = "性别不能为空")
+    @ApiModelProperty(value = "用户性别")
+    private Integer sex;
+
+    @NotNull(message = "年龄不能为空")
+    @Min(value = 18, message = "年龄必须在18-100岁之间")
+    @Max(value = 100, message = "年龄必须在18-100岁之间")
+    @ApiModelProperty(value = "年龄")
+    private Integer age;
+
+    @NotBlank(message = "邮箱不能为空")
+    @Email(message = "邮箱格式不正确")
+    @ApiModelProperty(value = "邮箱")
+    private String email;
+}
+```
+
+- `@ApiModel` : 此注解作用于实体类上，用于描述类；
+- `@ApiModelProperty` : 此注解作用于字段上，用于描述字段；
+
+## 10.5、测试
+
+重启项目，访问 http://localhost:8080/doc.html#/home
