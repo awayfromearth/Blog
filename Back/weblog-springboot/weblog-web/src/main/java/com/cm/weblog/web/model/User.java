@@ -5,6 +5,9 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import javax.validation.constraints.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Data
 @ApiModel(value = "用户实体类")
@@ -27,4 +30,8 @@ public class User {
     @Email(message = "邮箱格式不正确")
     @ApiModelProperty(value = "邮箱")
     private String email;
+
+    private LocalDateTime createTime;
+    private LocalDate updateDate;
+    private LocalTime time;
 }

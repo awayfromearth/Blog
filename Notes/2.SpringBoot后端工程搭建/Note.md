@@ -1612,3 +1612,140 @@ public class User {
 ## 10.5、测试
 
 重启项目，访问 http://localhost:8080/doc.html#/home
+
+# 十一、自定义Jackson序列化、反序列化支持日期
+
+## 11.1、自定义Jackson配置类
+
+在 `weblog-module-common` 模块中，新建 `config` 配置包，并创建 `JacksonConfig` 配置类，代码如下：
+
+```java
+package com.cm.weblog.common.config;
+
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateDeserializer;
+import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer;
+import com.fasterxml.jackson.datatype.jsr310.deser.LocalTimeDeserializer;
+import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer;
+import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
+import com.fasterxml.jackson.datatype.jsr310.ser.LocalTimeSerializer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.TimeZone;
+
+@Configuration
+public class JacksonConfig {
+    @Bean
+    public ObjectMapper objectMapper() {
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        // 忽略未知字段（前端传入某个字段后端未定义接受则忽略）
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+        // JavaTimeModule 用于指定序列化和反序列化规则
+        JavaTimeModule javaTimeModule = new JavaTimeModule();
+
+        // 支持 LocalDateTime、LocalDate、LocalTime
+        javaTimeModule.addSerializer(LocalDateTime.class, new LocalDateTimeSerializer(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        javaTimeModule.addDeserializer(LocalDateTime.class, new LocalDateTimeDeserializer(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        javaTimeModule.addSerializer(LocalDate.class, new LocalDateSerializer(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+        javaTimeModule.addDeserializer(LocalDate.class, new LocalDateDeserializer(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+        javaTimeModule.addSerializer(LocalTime.class, new LocalTimeSerializer(DateTimeFormatter.ofPattern("HH:mm:ss")));
+        javaTimeModule.addDeserializer(LocalTime.class, new LocalTimeDeserializer(DateTimeFormatter.ofPattern("HH:mm:ss")));
+
+        objectMapper.registerModule(javaTimeModule);
+
+        // 设置时区
+        objectMapper.setTimeZone(TimeZone.getTimeZone("Asia/Shanghai"));
+
+        return objectMapper;
+    }
+}
+```
+
+## 11.2、测试
+
+在 `User` 对象中，添加如下三个字段，用以测试三种类型的日期类是否能够正常序列化、反序列化：
+
+```java
+@Data
+@ApiModel(value = "用户实体类")
+public class User {
+	省略...
+
+    // 创建时间
+    private LocalDateTime createTime;
+    // 更新日期
+    private LocalDate updateDate;
+    // 时间
+    private LocalTime time;
+}
+```
+
+修改 `TestController` 中的 `/test` 接口：
+
+```java
+@PostMapping("/test")
+@ApiOperationLog(description = "测试接口")
+@ApiOperation(value = "测试接口")
+public Response test(@RequestBody @Validated User user) {
+	// 打印入参
+	log.info(JsonUtil.toJsonString(user));
+
+	// 设置三种日期字段值
+	user.setCreateTime(LocalDateTime.now());
+	user.setUpdateDate(LocalDate.now());
+	user.setTime(LocalTime.now());
+        
+	return Response.success(user);
+}
+```
+
+重启项目，请求 `/test` 接口，看下接口是否能够正常被请求：
+
+入参：
+
+```json
+{
+  "age": 22,
+  "email": "123@qq.com",
+  "sex": 0,
+  "username": "CM",
+  "createTime": "2022-09-02 12:00:00",
+  "updateDate": "2022-09-11",
+  "time": "12:00:00"
+}
+```
+
+日志打印：
+
+```shell
+User(username=CM, sex=0, age=22, email=123@qq.com, createTime=2022-09-02T12:00, updateDate=2022-09-11, time=12:00)
+```
+
+返参：
+
+```json
+{
+  "success": true,
+  "message": null,
+  "errorCode": null,
+  "data": {
+    "username": "CM",
+    "sex": 0,
+    "age": 22,
+    "email": "123@qq.com",
+    "createTime": "2025-07-08 21:08:24",
+    "updateDate": "2025-07-08",
+    "time": "21:08:24"
+  }
+}
+```
+

@@ -3,6 +3,7 @@ package com.cm.weblog.web.controller;
 import com.cm.weblog.common.aspect.ApiOperationLog;
 import com.cm.weblog.common.enums.ResponseCodeEnum;
 import com.cm.weblog.common.exception.BizException;
+import com.cm.weblog.common.utils.JsonUtil;
 import com.cm.weblog.common.utils.Response;
 import com.cm.weblog.web.model.User;
 import io.swagger.annotations.Api;
@@ -15,6 +16,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.stream.Collectors;
 
 @RestController
@@ -25,8 +29,12 @@ public class TestController {
     @ApiOperationLog(description = "测试接口")
     @ApiOperation(value = "测试接口")
     public Response<?> test(@RequestBody @Validated User user) {
-        // 主动定义一个运行时异常，分母不能为零
-//        int i = 1 / 0;
-        return Response.success();
+        log.info(JsonUtil.toJsonString(user));
+
+        user.setCreateTime(LocalDateTime.now());
+        user.setUpdateDate(LocalDate.now());
+        user.setTime(LocalTime.now());
+
+        return Response.success(user);
     }
 }
