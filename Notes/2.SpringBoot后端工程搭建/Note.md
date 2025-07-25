@@ -383,18 +383,19 @@ admin 模块：
 
 ![](images/17.png)
 
-## 2.2、默认激活dev环境
-
-修改 `application.yml`文件：
+## 2.2、修改 `application.yml`文件
 
 ```yml
 spring:
   profiles:
-    # 默认激活 dev 环境
-    active: dev
+    active: '@env@'
 ```
 
-## 2.3、验证是否生效
+## 2.3、切换环境的方式
+
+![](images/20.png)
+
+> 若启动项目时未切换选中环境可点击刷新后重新启动，最好是切换后先刷新再启动
 
 启动项目：
 
@@ -467,6 +468,13 @@ spring:
         </root>
     </springProfile>
 </configuration>
+```
+
+在`application-prod.yml`中添加配置：
+
+```yml
+logging:
+  config: classpath:logback-weblog.xml
 ```
 
 ## 3.3、测试
