@@ -90,4 +90,90 @@ app.mount('#app')
 
 ## 三、Vite配置路径别名
 
-略
+修改`vite.config.js`代码如下：
+
+```js
+import { defineConfig } from 'vite'
+import { fileURLToPath ,URL } from "node:url"
+import vue from '@vitejs/plugin-vue'
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [vue()],
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)) // 对应当前文件所在目录下的src目录的绝对文件路径
+    }
+  }
+})
+```
+
+## 四、整合 Tailwind CSS
+
+### 4.1、安装
+
+```shell
+npm i -D tailwindcss@3 postcss autoprefixer
+```
+
+### 4.2、生成配置文件
+
+```shell
+npx tailwindcss init -p
+```
+
+执行完成后，生成
+
+- `tailwind.config.js`
+- postcss.config.js
+
+### 4.3、配置模板路径
+
+在`tailwind.config.js`文件中，添加所有模板文件的路径：
+
+```js
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+      "./index.html",
+      "./src/**/*.{vue,js,ts,jsx,tsx}"
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+```
+
+### 4.4、添加 Tailwind 指令
+
+在`src`目录下新建`assets`目录，在此目录下新建`main.css`，内容如下：
+
+```css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+修改`main.js`，引入`main.css`
+
+```js
+import "@/assets/main.css"
+```
+
+### 4.5、测试
+
+重新`npm run dev`，修改`/frontend/index.vue`
+
+```vue
+<template>
+  <h1>
+    首页
+  </h1>
+  <div class="bg-green-300 inline">绿色</div>
+  <div class="bg-yellow-300 ml-2 inline">黄色</div>
+  <div class="bg-blue-300 ml-2 inline">蓝色</div>
+  <div class="text-xs sm:text-lg md:text-xl lg:text-2xl">响应式字体</div>
+</template>
+```
+
