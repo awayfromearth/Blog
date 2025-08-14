@@ -312,3 +312,114 @@ onMounted(() => {
 </template>
 ```
 
+## 六、整合 Element Plus 组件库
+
+### 6.1、安装
+
+```shell
+npm i element-plus
+```
+
+### 6.2、配置自动导入
+
+安装`unplugin-vue-components` 和 `unplugin-auto-import`插件
+
+```shell
+npm i -D unplugin-vue-components unplugin-auto-import
+```
+
+然后把下列代码插入到配置文件 `vite.config.js` 中
+
+```js
+import { defineConfig } from 'vite'
+import AutoImport from 'unplugin-auto-import/vite'
+import Components from 'unplugin-vue-components/vite'
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
+
+export default defineConfig({
+  // ...
+  plugins: [
+    // ...
+    AutoImport({
+      resolvers: [ElementPlusResolver()],
+    }),
+    Components({
+      resolvers: [ElementPlusResolver()],
+    }),
+  ],
+})
+```
+
+完成上面工作后，在控制台 执行 `npm run dev` 重新运行一下项目
+
+### 6.3、测试
+
+**新增一个登录页**
+
+在 `/pages/admin/` 中新建一个 `login.vue` 登录页面
+
+```vue
+<template>
+    <div class="p-2">
+        <h1>登录页</h1>
+        <el-row class="mb-4">
+            <el-button>Default</el-button>
+            <el-button type="primary">Primary</el-button>
+            <el-button type="success">Success</el-button>
+            <el-button type="info">Info</el-button>
+            <el-button type="warning">Warning</el-button>
+            <el-button type="danger">Danger</el-button>
+        </el-row>
+
+        <el-row class="mb-4">
+            <el-button plain>Plain</el-button>
+            <el-button type="primary" plain>Primary</el-button>
+            <el-button type="success" plain>Success</el-button>
+            <el-button type="info" plain>Info</el-button>
+            <el-button type="warning" plain>Warning</el-button>
+            <el-button type="danger" plain>Danger</el-button>
+        </el-row>
+
+        <el-row class="mb-4">
+            <el-button round>Round</el-button>
+            <el-button type="primary" round>Primary</el-button>
+            <el-button type="success" round>Success</el-button>
+            <el-button type="info" round>Info</el-button>
+            <el-button type="warning" round>Warning</el-button>
+            <el-button type="danger" round>Danger</el-button>
+        </el-row>
+
+    </div>
+</template>
+```
+
+**添加路由**
+
+在 `/router/index.js` 中添加对应的路由
+
+```js
+import Login from '@/pages/admin/login.vue'
+
+// 统一在这里声明所有路由
+const routes = [
+    // 省略...
+    {
+        path: '/login', // 登录页
+        component: Login,
+        meta: {
+            title: 'Weblog 登录页'
+        }
+    },
+]
+    // 省略...
+```
+
+**跳转**
+
+编辑 `/pages/frontend/index.vue` 首页文件，为登录按钮添加点击事件，实现跳转功能
+
+```vue
+<!-- 登录 -->
+<div class="text-gray-900 ml-1 mr-1 hover:text-blue-700" @click="$router.push('/login')">登录</div>
+```
+
