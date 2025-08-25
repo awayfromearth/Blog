@@ -1,3 +1,16 @@
+# 登录模块开发
+
+## 一、登录页面开发
+
+### 1.1、静态页面开发
+
+略
+
+### 1.2、用Animate.css添加动画效果
+
+最终代码如下：
+
+```vue
 <template>
   <!-- 使用 grid 网格布局，并指定列数为 2，高度占满全屏 -->
   <div class="grid grid-cols-2 h-screen">
@@ -49,3 +62,31 @@
 // 引入 Element Plus 中的用户、锁图标
 import { User, Lock } from '@element-plus/icons-vue'
 </script>
+```
+
+ElementPlus自动注册:
+
+```js
+// src/utils/elementIconInstaller.js
+import * as ElementPlusIconsVue from "@element-plus/icons-vue"
+
+export function install(app) {
+    for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+        app.component(key, component)
+    }
+}
+```
+
+```js
+// main.js
+// 省略...
+import { install } from "@/utils/elementIconInstaller.js"
+
+// 省略...
+install(app)
+```
+
+## 二、整合 Mybatis Plus
+
+### 2.1、
+
