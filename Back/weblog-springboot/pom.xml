@@ -98,7 +98,6 @@
         </pluginManagement>
     </build>
 
-
     <!-- 使用阿里云的 Maven 仓库源提升包下载速度 -->
     <repositories>
         <repository>
@@ -107,4 +106,24 @@
             <url>https://maven.aliyun.com/repository/public</url>
         </repository>
     </repositories>
+
+    <profiles>
+        <profile>
+            <id>dev</id>
+            <properties>
+                <env>dev</env>
+            </properties>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+        </profile>
+
+        <profile>
+            <id>prod</id>
+            <properties>
+                <env>prod</env>
+            </properties>
+        </profile>
+    </profiles>
+
 </project>

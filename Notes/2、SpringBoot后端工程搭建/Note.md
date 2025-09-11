@@ -391,3 +391,72 @@
 
 ```
 
+### 备注：解决 pom.xml 黄色波浪线警告
+
+![](images/8.png)
+
+### 1.6、测试
+
+刷新`Maven`下载依赖包：
+
+![](images/7.png)
+
+选中跳过测试的按钮：
+
+![](images/14.png)
+
+打包：
+
+![](images/15.png)
+
+打包成功会在`target`目录下输出`jar`包
+
+启动项目：启动`weblog-springboot`的`WeblogWebApplication`类：
+
+![](images/16.png)
+
+## 二、项目多环境配置
+
+### 2.1、配置 weblog-springboot 环境
+
+修改`pom.xml`，内容如下：
+
+```xml
+<project>
+	...省略
+    
+	<profiles>
+        <profile>
+            <id>dev</id>
+            <properties>
+                <env>dev</env>
+            </properties>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+        </profile>
+
+        <profile>
+            <id>prod</id>
+            <properties>
+                <env>prod</env>
+            </properties>
+        </profile>
+    </profiles>
+    
+</project>
+```
+
+### 2.2、新建环境配置文件
+
+![](images/19.png)
+
+### 2.3、测试
+
+切换环境：
+
+![](images/18.png)
+
+输出结果：
+
+![](images/17.png)
