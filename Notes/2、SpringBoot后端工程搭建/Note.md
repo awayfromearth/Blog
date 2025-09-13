@@ -460,3 +460,409 @@
 输出结果：
 
 ![](images/17.png)
+
+## 三、整合 Logback 日志
+
+### 3.1、引入依赖
+
+由于之前在`weblog-web`模块中已引入过`spring-boot-starter-web`依赖，它会自动包含`Logback`相关依赖，所以无需再额外添加依赖
+
+### 3.2、配置
+
+在`weblog-web/src/main/resources`目录下新建文件`logback-weblog.xml`配置文件，内容如下：
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<configuration>
+    <jmxConfigurator />
+    <include resource="org/springframework/boot/logging/logback/defaults.xml" />
+
+    <property scope="context" name="appName" value="weblog" />
+    <!-- 自定义日志输出路径及名称前缀-->
+    <property name="LOG_FILE" value="/app/weblog/logs/${appName}.%d{yyyy-MM-dd}" /> <!-- 输出控制台路径 -->
+    <!-- <property name="LOG_FILE" value="D:\\GitRepository\\Projects\\Blog\\Back\\weblog-springboot\\logs\\${appName}.%d{yyyy-MM-dd}" /> --> <!-- 输出文件路径 -->
+    <!-- 格式化输出：%d 表示日期，%thread 表示线程，%-5level表示从左显示5个字符宽度， %msg% 表示日志消息  -->
+    <property name="FILE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n" />
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- 日志输出文件名 -->
+            <FileNamePattern>${LOG_FILE}-%i.log</FileNamePattern>
+            <!-- 日志保留天数-->
+            <MaxHistory>30</MaxHistory>
+            <!-- 日志文件最大大小 -->
+            <TimeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>10MB</maxFileSize>
+            </TimeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <!-- 格式化输出： -->
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- dev环境下日志仅输出到控制台 -->
+    <springProfile name="dev">
+        <include resource="org/springframework/boot/logging/logback/console-appender.xml" />
+        <root level="info">
+            <appender-ref ref="CONSOLE" />
+        </root>
+    </springProfile>
+
+    <!-- PROD环境下日志输出到文件 -->
+    <springProfile name="prod">
+        <include resource="org/springframework/boot/logging/logback/console-appender.xml" />
+        <root level="INFO">
+            <appender-ref ref="FILE" />
+        </root>
+    </springProfile>
+</configuration>
+```
+
+由于输出日志到文件只需在生产环境开启，所以仅需在生产环境`application-prod.yml`配置
+
+```yml
+# 日志
+logging:
+  config: classpath:logback-weblog.xml
+```
+
+### 3.3、测试
+
+在单元测试包下的`WeblogWebApplicationTests`类中新增一个`testLog`测试方法以及`@Slf4j`注解，代码如下：
+
+```java
+package com.cm.weblog.web;
+
+import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+@Slf4j // 自动生成日志实例
+class WeblogWebApplicationTests {
+
+    @Test
+    void contextLoads() {
+    }
+
+    @Test
+    void testLog() {
+        log.info("这是一行 INFO 级别日志");
+        log.warn("这是一行 WARN 级别日志");
+        log.error("这是一行 ERROR 级别日志");
+
+        // 占位符
+        String author = "CM";
+        log.info("这是一行带有占位符的日志记录，作者：{}", author);
+    }
+}
+
+```
+
+在`dev`环境下运行测试方法，结果如下：
+
+![](images/20.png)
+
+在`prod`环境下运行测试方法，日志成功输出到指定文件
+
+> 测试完记得把环境改回`dev`
+
+## 四、自定义注解实现 AOP 请求日志切面
+
+### 4.1、引入依赖
+
+父项目中添加`jackson`工具版本号及依赖管理，它用于将出入参转为`JSON`字符串
+
+```xml
+<!-- 版本号统一管理 -->
+<properties>
+    ...省略
+    <jackson.version>2.15.2</jackson.version>
+</properties>
+
+ <!-- 统一依赖管理-->
+<dependencyManagement>
+    <dependencies>
+    	...省略
+        <dependency>
+        	<groupId>com.fasterxml.jackson.core</groupId>
+        	<artifactId>jackson-databind</artifactId>
+        	<version>${jackson.version}</version>
+       	</dependency>
+
+        <dependency>
+        	<groupId>com.fasterxml.jackson.core</groupId>
+        	<artifactId>jackson-core</artifactId>
+        	<version>${jackson.version}</version>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+```
+
+在`weblog-module-common`中引用依赖：
+
+```xml
+...省略
+<!-- Jackson -->
+<dependency>
+	<groupId>com.fasterxml.jackson.core</groupId>
+	<artifactId>jackson-databind</artifactId>
+</dependency>
+
+<dependency>
+	<groupId>com.fasterxml.jackson.core</groupId>
+	<artifactId>jackson-core</artifactId>
+</dependency>
+```
+
+### 4.2、自定义注解
+
+在`weblog-module-common`模块下新建`aspect`包用于放置切面相关的功能类，在其中创建一个`ApiOpeationLog`的注解，内容如下：
+
+```java
+package com.cm.weblog.common.aspect;
+
+import java.lang.annotation.*;
+
+@Retention(RetentionPolicy.RUNTIME) // 指定注解在运行时保留(可以通过反射在运行时被访问和解析)
+@Target({ElementType.METHOD}) // 指定该注解作用于方法
+@Documented // 生成文档时注解元素及注解信息会被包含
+public @interface ApiOperationLog {
+    /**
+     * API 功能描述
+     * @return String
+     */
+    String description() default "";
+}
+
+```
+
+### 4.3、创建 JSON 工具类
+
+在`weblog-module-common`模块下新建`utils`包，在其中新建一个`JsonUtil`类，用于转成`JSON`字符串，内容如下：
+
+```java
+package com.cm.weblog.common.utils;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+/**
+ * JSON 工具类
+ */
+public class JsonUtil {
+    private static final ObjectMapper mapper = new ObjectMapper();
+
+    public static String toJson(Object obj) {
+        try {
+            return mapper.writeValueAsString(obj);
+        } catch (JsonProcessingException e) {
+            return obj.toString();
+        }
+    }
+}
+```
+
+### 4.4、自定义切面类
+
+在`aspect`包下新建`ApiOperationLogAspect`类，代码如下：
+
+```java
+package com.cm.weblog.common.aspect;
+
+import com.cm.weblog.common.utils.JsonUtil;
+import lombok.extern.slf4j.Slf4j;
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Pointcut;
+import org.aspectj.lang.reflect.MethodSignature;
+import org.slf4j.MDC;
+import org.springframework.stereotype.Component;
+
+import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+/**
+ * 自定义切面类
+ */
+@Aspect // 声明该类为一个切面类
+@Component
+@Slf4j
+public class ApiOperationLogAspect {
+    /**
+     * 以自定义 @ApiOperationLog 注解为切点
+     * 凡是添加该注解的方法都会执行环绕中的代码
+     */
+    @Pointcut("@annotation(com.cm.weblog.common.aspect.ApiOperationLog)")
+    public void apiOperationLog() {}
+
+    /**
+     * 环绕
+     * @param joinPoint 切点
+     * @return 请求结果
+     * @throws Throwable 异常
+     */
+    @Around("apiOperationLog()")
+    public Object doAround(ProceedingJoinPoint joinPoint) throws Throwable {
+        try {
+            long startTime = System.currentTimeMillis();
+
+            MDC.put("traceId", UUID.randomUUID().toString());
+
+            // 获取处理请求的类和方法
+            String className = joinPoint.getTarget().getClass().getSimpleName();
+            String methodName = joinPoint.getSignature().getName();
+
+            // 获取请求入参并转成 JSON 字符串
+            Object[] args = joinPoint.getArgs();
+            String argsJson = Arrays.stream(args).map(toJsonString()).collect(Collectors.joining(", "));
+
+            // 功能描述信息
+            String description = getApiOperationLogDescription(joinPoint);
+
+            // 打印入参
+            log.info("====== 请求开始：[{}]，入参：{}，请求类：{}, 请求方法：{} ============================ ", description, argsJson, className, methodName);
+
+            // 执行切点方法
+            Object result = joinPoint.proceed(args);
+
+            // 计算执行耗时
+            long executionTime = System.currentTimeMillis() - startTime;
+
+            // 打印出参
+            log.info("====== 请求结束：[{}]，耗时：{}ms， 出参：{} ============================ ", description, executionTime, JsonUtil.toJson(result));
+
+            return result;
+        } finally {
+            MDC.clear();
+        }
+    }
+
+    /**
+     * 转 JSON
+     * @return Function
+     */
+    private Function<Object, String> toJsonString() {
+        return JsonUtil::toJson;
+    }
+
+    /**
+     * 获取注解的描述信息
+     * @param joinPoint 切点
+     * @return 注解描述
+     */
+    private String getApiOperationLogDescription(ProceedingJoinPoint joinPoint) {
+        // 获取方法签名
+        MethodSignature methodSignature = (MethodSignature) joinPoint.getSignature();
+
+        // 获取被注解的方法
+        Method method = methodSignature.getMethod();
+
+        // 提取注解
+        ApiOperationLog annotation = method.getAnnotation(ApiOperationLog.class);
+
+        // 提取 description 属性
+        return annotation.description();
+    }
+}
+
+```
+
+### 4.5、添加包扫描
+
+在`weblog-web`的启动类中添加包扫描
+
+```java
+package com.cm.weblog.web;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.ComponentScan;
+
+@SpringBootApplication
+@ComponentScan({"com.cm.weblog.*"}) // 多模块项目中必须手动指定要扫描的包下面的所有类
+public class WeblogWebApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(WeblogWebApplication.class, args);
+    }
+
+}
+
+```
+
+### 4.6、测试
+
+在`weblog-web`模块下新建`model`包存储`pojo`对象，新建`User`类用于测试：
+
+```java
+package com.cm.weblog.web.model;
+
+import lombok.Data;
+
+@Data
+public class User {
+    private String username;
+    private Integer sex;
+}
+
+```
+
+在`weblog-web`模块下新建`controller`包，新建`TestController`类测试请求，内容如下：
+
+```java
+package com.cm.weblog.web.controller;
+
+import com.cm.weblog.common.aspect.ApiOperationLog;
+import com.cm.weblog.web.model.User;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * 测试请求类
+ */
+@RestController
+public class TestController {
+    @PostMapping("/test")
+    @ApiOperationLog(description = "测试接口")
+    public User test(@RequestBody User user) {
+        return user;
+    }
+}
+
+```
+
+发送请求：
+
+**入参**：
+
+```json
+{
+    "username": "昌帅",
+    "sex": 2
+}
+```
+
+**出参**：
+
+```json
+{
+    "username": "昌帅",
+    "sex": 2
+}
+```
+
+**打印日志**：
+
+```json
+请求开始：[测试接口]，入参：{"username":"昌帅","sex":25}，请求类：TestController, 请求方法：test ============================ 
+请求结束：[测试接口]，耗时：1ms， 出参：{"username":"昌帅","sex":25} ============================ 
+```
+
