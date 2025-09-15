@@ -605,6 +605,12 @@ class WeblogWebApplicationTests {
 
 ```xml
 ...省略
+<!-- AOP 切面 -->
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-aop</artifactId>
+</dependency>
+
 <!-- Jackson -->
 <dependency>
 	<groupId>com.fasterxml.jackson.core</groupId>
