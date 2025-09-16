@@ -872,3 +872,26 @@ public class TestController {
 请求结束：[测试接口]，耗时：1ms， 出参：{"username":"昌帅","sex":25} ============================ 
 ```
 
+## 五、MDC 跟踪日志
+
+上文中在`ApiOperationLogAspect`切面类中依然放置了`MDC`相关代码：
+
+```java
+// ...省略
+MDC.put("traceId", UUID.randomUUID().toString());
+
+// ...省略
+MDC.clear();
+```
+
+一是为了向请求放入跟踪标识，二是为了避免污染其他请求清除值
+
+若要引用该请求标识，可修改`logback-weblog.xml`配置文件中`FILE_LOG_PATTERN`配置，向其中加入`TraceId`：
+
+```xml
+<property name="FILE_LOG_PATTERN" value="[TraceId: %X{traceId}] %d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n" />
+```
+
+这样日志中即使有多线程情况下高并发的请求也可以通过这个标识识别每个请求的记录
+
+修改环境为`prod`，重新启动项目，再次请求`/test`接口，查看日志中是否已经加入了`TraceId`
