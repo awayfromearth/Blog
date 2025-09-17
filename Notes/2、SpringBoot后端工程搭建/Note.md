@@ -895,3 +895,149 @@ MDC.clear();
 这样日志中即使有多线程情况下高并发的请求也可以通过这个标识识别每个请求的记录
 
 修改环境为`prod`，重新启动项目，再次请求`/test`接口，查看日志中是否已经加入了`TraceId`
+
+## 六、参数校验
+
+### 6.1、引入依赖
+
+在`weblog-web`模块中引入`spring-boot-starter-validation`依赖
+
+```xml
+<!-- 参数校验 -->
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-validation</artifactId>
+</dependency>
+```
+
+### 6.2、配置实体类校验规则
+
+修改`User`类，新增年龄和邮箱字段并配置校验规则：
+
+- 用户名和性别：不能为空
+
+- 年龄：
+  - 不能为空
+  - 18 ~ 100
+
+- 邮箱：
+  - 不能为空
+  - 邮箱格式
+
+修改后内容如下：
+
+```java
+package com.cm.weblog.web.model;
+
+import lombok.Data;
+
+import javax.validation.constraints.*;
+
+@Data
+public class User {
+    @NotBlank(message = "用户名不能为空")
+    private String username;
+
+    @NotNull(message = "性别不能为空")
+    private Integer sex;
+
+    @NotNull(message = "年龄不能为空")
+    @Min(value = 18, message = "年龄必须在18到100岁之间")
+    @Max(value = 100, message = "年龄必须在18到100岁之间")
+    private Integer age;
+
+    @NotBlank(message = "邮箱不能为空")
+    @Email(message = "邮箱格式不正确")
+    private String email;
+}
+
+```
+
+### 6.3、在 Controller 层中捕获校验结果
+
+修改`TestController`类，内容如下：
+
+```java
+package com.cm.weblog.web.controller;
+
+import com.cm.weblog.common.aspect.ApiOperationLog;
+import com.cm.weblog.web.model.User;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.stream.Collectors;
+
+/**
+ * 测试请求类
+ */
+@RestController
+public class TestController {
+    @PostMapping("/test")
+    @ApiOperationLog(description = "测试接口")
+    public ResponseEntity<String> test(@RequestBody @Validated User user, BindingResult bindingResult) {
+        /*
+            项目初始化启动测试代码
+        */
+        // return user;
+
+        /*
+            参数校验测试代码
+        */
+        if (bindingResult.hasErrors()) {
+            String errorMessage = bindingResult.getFieldErrors()
+                    .stream()
+                    .map(FieldError::getDefaultMessage)
+                    .collect(Collectors.joining("，"));
+
+            return ResponseEntity.badRequest().body(errorMessage);
+        }
+
+        return ResponseEntity.ok("参数没有任何问题");
+    }
+}
+
+```
+
+### 6.4、测试
+
+入参：
+
+```json
+{
+    "username": "渠磊",
+    "sex": 1,
+    "age": 28,
+    "email": "lm1md22@yahoo.cn"
+}
+```
+
+出参：
+
+```json
+参数没有任何问题
+```
+
+结果正常
+
+入参错误的情况：
+
+```json
+{
+    "username": "",
+    "sex": null,
+    "age": 128,
+    "email": "lm1md22yahoo.cn"
+}
+```
+
+出参：
+
+```json
+用户名不能为空，邮箱格式不正确，年龄必须在18到100岁之间，性别不能为空
+```
+

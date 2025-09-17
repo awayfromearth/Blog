@@ -5,8 +5,8 @@
 
     <property scope="context" name="appName" value="weblog" />
     <!-- 自定义日志输出路径及名称前缀-->
-    <!-- <property name="LOG_FILE" value="/app/weblog/logs/${appName}.%d{yyyy-MM-dd}" /> --> <!-- 输出控制台路径 -->
-    <property name="LOG_FILE" value="D:\\GitRepository\\Projects\\Blog\\Back\\weblog-springboot\\logs\\${appName}.%d{yyyy-MM-dd}" /> <!-- 输出文件路径 -->
+    <property name="LOG_FILE" value="/app/weblog/logs/${appName}.%d{yyyy-MM-dd}" /> <!-- 输出控制台路径 -->
+    <!-- <property name="LOG_FILE" value="D:\\GitRepository\\Projects\\Blog\\Back\\weblog-springboot\\logs\\${appName}.%d{yyyy-MM-dd}" /> --> <!-- 输出文件路径 -->
     <!-- 格式化输出：%d 表示日期，%thread 表示线程，%-5level表示从左显示5个字符宽度， %msg% 表示日志消息  -->
     <property name="FILE_LOG_PATTERN" value="[TraceId: %X{traceId}] %d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n" />
 
