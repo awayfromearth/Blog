@@ -1041,3 +1041,218 @@ public class TestController {
 用户名不能为空，邮箱格式不正确，年龄必须在18到100岁之间，性别不能为空
 ```
 
+## 七、自定义响应工具类
+
+### 7.1、设计响应模型
+
+**成功响应：**
+
+```json
+{
+    "success": true,
+    "data": null
+}
+```
+
+- `success`：是否请求成功
+- `data`：响应数据
+
+**失败响应：**
+
+```json
+{
+    "success": false,
+    "errorCode": "10000",
+    "message": "用户名不能为空"
+}
+```
+
+- `message`：服务端响应消息
+- `success`：同上
+- `errorCode`：异常码
+
+### 7.2、创建响应参数工具类：
+
+在`weblog-module-common`模块下新建`utils`包，然后创建`Response`工具类，内容如下：
+
+```java
+package com.cm.weblog.common.utils;
+
+import lombok.Data;
+
+import java.io.Serializable;
+
+/**
+ * 自定义响应工具类
+ */
+@Data
+public class Response<T> implements Serializable {
+    private boolean success = true;
+    private String errorMessage;
+    private String errorCode;
+    private T data;
+
+    /*
+    * 成功响应
+    * */
+    public static <T> Response<T> success() {
+        return new Response<>();
+    }
+
+    public static <T> Response<T> success(T data) {
+        Response<T> response = new Response<>();
+        response.setData(data);
+        return response;
+    }
+
+    /*
+    * 失败响应
+    * */
+    public static <T> Response<T> fail() {
+        Response<T> response = new Response<>();
+        response.setSuccess(false);
+        return response;
+    }
+
+    public static <T> Response<T> fail(String message) {
+        Response<T> response = new Response<>();
+        response.setSuccess(false);
+        response.setErrorMessage(message);
+        return response;
+    }
+
+    public static <T> Response<T> fail(String code, String message) {
+        Response<T> response = new Response<>();
+        response.setSuccess(false);
+        response.setErrorCode(code);
+        response.setErrorMessage(message);
+        return response;
+    }
+}
+
+```
+
+### 7.3、在 Controller 中使用
+
+在`TestController`类中使用：
+
+```java
+package com.cm.weblog.web.controller;
+
+import com.cm.weblog.common.aspect.ApiOperationLog;
+import com.cm.weblog.common.utils.Response;
+import com.cm.weblog.web.model.User;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.stream.Collectors;
+
+/**
+ * 测试请求类
+ */
+@RestController
+public class TestController {
+    @PostMapping("/test")
+    @ApiOperationLog(description = "测试接口")
+    public Response<?> test(@RequestBody @Validated User user, BindingResult bindingResult) {
+        /*
+            项目初始化启动测试代码
+        */
+        // return user;
+
+        /*
+            参数校验测试代码
+        */
+        /*if (bindingResult.hasErrors()) {
+            String errorMessage = bindingResult.getFieldErrors()
+                    .stream()
+                    .map(FieldError::getDefaultMessage)
+                    .collect(Collectors.joining("，"));
+
+            return ResponseEntity.badRequest().body(errorMessage);
+        }
+
+        return ResponseEntity.ok("参数没有任何问题");*/
+
+        /*
+            自定义响应工具类测试代码
+        */
+        if (bindingResult.hasErrors()) {
+            String errorMessage = bindingResult.getFieldErrors()
+                    .stream()
+                    .map(FieldError::getDefaultMessage)
+                    .collect(Collectors.joining("，"));
+
+            return Response.fail(errorMessage);
+        }
+
+        return Response.success(user);
+    }
+}
+
+```
+
+### 7.4、测试
+
+重启项目，测试`/test/`请求
+
+**失败响应：**
+
+入参：
+
+```json
+{
+    "username": "",
+    "sex": null,
+    "age": 128,
+    "email": "lm1md22yahoo.cn"
+}
+```
+
+返回：
+
+```json
+{
+    "success": false,
+    "errorMessage": "性别不能为空，用户名不能为空，年龄必须在18到100岁之间，邮箱格式不正确",
+    "errorCode": null,
+    "data": null
+}
+```
+
+
+
+**成功响应：**
+
+入参：
+
+```json
+{
+    "username": "渠磊",
+    "sex": 1,
+    "age": 28,
+    "email": "lm1md22@yahoo.cn"
+}
+```
+
+返回：
+
+```json
+{
+    "success": true,
+    "errorMessage": null,
+    "errorCode": null,
+    "data": {
+        "username": "渠磊",
+        "sex": 1,
+        "age": 28,
+        "email": "lm1md22@yahoo.cn"
+    }
+}
+```
+
