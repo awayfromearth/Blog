@@ -1254,3 +1254,224 @@ public class TestController {
 }
 ```
 
+## 八、全局异常管理
+
+### 8.1、自定义基础异常接口
+
+在`weblog-module-common`模块中新建`exception`包，自定义`BaseExceptionInterface`基础异常接口：
+
+```java
+package com.cm.weblog.common.exception;
+
+/**
+ * 基础异常接口
+ */
+public interface BaseExceptionInterface {
+    String getErrorCode();
+
+    String getErrorMessage();
+}
+
+```
+
+### 8.2、自定义错误码枚举
+
+新建`enums`包统一放置枚举，新建`ResponseCodeEnum`枚举类：
+
+```java
+package com.cm.weblog.common.enums;
+
+import com.cm.weblog.common.exception.BaseExceptionInterface;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+/**
+ * 响应异常码枚举
+ */
+@Getter
+@AllArgsConstructor
+public enum ResponseCodeEnum implements BaseExceptionInterface {
+    /*
+    * 通用异常状态码
+    * */
+    SYSTEM_ERROR("10000", "出错啦，后台小哥正在努力修复中..."),
+
+    /*
+    * 业务异常状态码
+    * */
+    PRODUCT_NOT_FOUND("20000", "该产品不存在（测试使用）"),
+    ;
+
+    private final String errorCode;
+
+    private final String errorMessage;
+}
+
+```
+
+### 8.3、自定义业务异常
+
+创建`BizException`类处理自定义业务异常：
+
+```java
+package com.cm.weblog.common.exception;
+
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+ * 业务异常类
+ */
+@Getter
+@Setter
+public class BizException extends RuntimeException {
+    private String errorCode;
+
+    private String errorMessage;
+
+    public BizException(BaseExceptionInterface baseExceptionInterface) {
+        this.errorCode = baseExceptionInterface.getErrorCode();
+        this.errorMessage = baseExceptionInterface.getErrorMessage();
+    }
+}
+
+```
+
+### 8.4、响应工具类拓展异常响应方法
+
+在`Response`响应工具类中添加方法处理自定义业务异常及支持直接传入异常码枚举：
+
+```java
+/**
+* 处理业务异常
+* @param bizException 自定义业务异常
+* @return Response
+* @param <T> ?
+*/
+public static <T> Response<T> fail(BizException bizException) {
+	Response<T> response = new Response<>();
+	response.setSuccess(false);
+	response.setCode(bizException.getErrorCode());
+	response.setMessage(bizException.getErrorMessage());
+	return response;
+}
+
+/**
+* 支持直接传入异常码枚举
+* @param baseExceptionInterface 枚举
+* @return Response
+* @param <T> ?
+*/
+public static <T> Response<T> fail(BaseExceptionInterface baseExceptionInterface) {
+	Response<T> response = new Response<>();
+	response.setSuccess(false);
+	response.setCode(baseExceptionInterface.getErrorCode());
+	response.setMessage(baseExceptionInterface.getErrorMessage());
+	return response;
+}
+```
+
+### 8.5、创建全局异常处理类
+
+在`weblog-module-common`模块中引入`sprint-boot-start-web`以使用`@ControllerAdvice`注解创建全局异常处理类
+
+```xml
+...省略
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+```
+
+在`exception`包下创建全局异常处理类`GlobalExceptionHandler`处理业务异常及运行异常：
+
+```java
+package com.cm.weblog.common.exception;
+
+import com.cm.weblog.common.enums.ResponseCodeEnum;
+import com.cm.weblog.common.utils.Response;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import javax.servlet.http.HttpServletRequest;
+
+/**
+ * 全局异常处理类
+ */
+@ControllerAdvice
+@Slf4j
+public class GlobalExceptionHandler {
+    /**
+     * 处理自定义业务异常
+     * @param request 请求对象
+     * @param e 业务异常
+     * @return Response
+     */
+    @ExceptionHandler({ BizException.class })
+    @ResponseBody
+    public Response<Object> handleBizException(HttpServletRequest request, BizException e) {
+        log.warn("{} request fail, errorCode: {}, errorMessage: {}", request.getRequestURI(), e.getErrorCode(), e.getErrorMessage());
+        return Response.fail(e);
+    }
+
+    /**
+     * 处理运行时业务异常
+     * @param request 请求对象
+     * @param e 异常
+     * @return Response
+     */
+    @ExceptionHandler({ Exception.class })
+    @ResponseBody
+    public Response<Object> handleOtherException(HttpServletRequest request, Exception e) {
+        log.warn("{} request error", request.getRequestURI(), e);
+        return Response.fail(ResponseCodeEnum.SYSTEM_ERROR);
+    }
+}
+
+```
+
+### 8.6、测试
+
+修改`TestController`中的`test`方法手动抛出一个业务异常：
+
+```java
+ /*
+	自定义业务异常测试代码
+*/
+throw new BizException(ResponseCodeEnum.PRODUCT_NOT_FOUND);
+```
+
+请求`/test`接口：
+
+```json
+{
+    "success": false,
+    "message": "该产品不存在（测试使用）",
+    "code": "20000",
+    "data": null
+}
+```
+
+修改`TestController`中的`test`方法手动抛出一个运行时异常：
+
+```java
+/*
+	运行时异常测试代码
+*/
+int i = 1 / 0;
+return Response.success();
+```
+
+请求`/test`接口：
+
+```json
+{
+    "success": false,
+    "message": "出错啦，后台小哥正在努力修复中...",
+    "code": "10000",
+    "data": null
+}
+```
+
