@@ -1199,7 +1199,7 @@ public class TestController {
 
 ### 7.4、测试
 
-重启项目，测试`/test/`请求
+重启项目，测试`/test`请求
 
 **失败响应：**
 
@@ -1224,8 +1224,6 @@ public class TestController {
     "data": null
 }
 ```
-
-
 
 **成功响应：**
 
