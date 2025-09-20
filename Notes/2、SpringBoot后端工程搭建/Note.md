@@ -1062,7 +1062,7 @@ public class TestController {
 ```json
 {
     "success": false,
-    "errorCode": "10000",
+    "code": "10000",
     "message": "用户名不能为空"
 }
 ```
