@@ -1505,3 +1505,161 @@ return Response.success();
 }
 ```
 
+## 九、拓展全局异常管理处理参数校验异常
+
+### 9.1、枚举中添加参数异常
+
+在`ResponseCodeEnum`枚举中添加参数错误异常：
+
+```java
+PARAM_NOT_VALID("10001", "参数错误"),
+```
+
+### 9.2、全局异常处理类新增处理参数校验异常方法
+
+在`GlobalExceptionHandler`类中添加`handleMethodArgumentNotValidException`方法：
+
+```java
+/**
+* 处理参数异常
+* @param request 请求对象
+* @param e 参数校验异常
+* @return 响应对象
+*/
+@ExceptionHandler({ MethodArgumentNotValidException.class })
+@ResponseBody
+public Response<Object> handleMethodArgumentNotValidException(HttpServletRequest request, MethodArgumentNotValidException e) {
+	// 获取参数错误异常码
+	String errorCode = ResponseCodeEnum.PARAM_NOT_VALID.getErrorCode();
+
+	// 获取BindingResult
+	BindingResult bindingResult = e.getBindingResult();
+
+	StringBuilder sb = new StringBuilder();
+
+	// 组合错误信息
+	Optional.of(bindingResult.getFieldErrors()).ifPresent(errors -> {
+		errors.forEach(error ->
+			sb.append(error.getField())
+				.append(" ")
+				.append(error.getDefaultMessage())
+				.append("，当前值：’")
+				.append(error.getRejectedValue())
+				.append("'；")
+		);
+	});
+
+	String errorMessage = sb.toString();
+
+	log.warn("{} request error, errorCode: {}, errorMessage: {}", request.getRequestURI(), errorCode, errorMessage);
+
+	return Response.fail(errorCode, errorMessage);
+}
+```
+
+### 9.3、测试
+
+修改`TestController`中的`/test`接口，移除参数`BindingResult`，将参数校验异常交给全局异常管理来处理：
+
+```java
+package com.cm.weblog.web.controller;
+
+import com.cm.weblog.common.aspect.ApiOperationLog;
+import com.cm.weblog.common.enums.ResponseCodeEnum;
+import com.cm.weblog.common.exception.BizException;
+import com.cm.weblog.common.utils.Response;
+import com.cm.weblog.web.model.User;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.stream.Collectors;
+
+/**
+ * 测试请求类
+ */
+@RestController
+public class TestController {
+    @PostMapping("/test")
+    @ApiOperationLog(description = "测试接口")
+    public Response<?> test(@RequestBody @Validated User user) {
+        /*
+            项目初始化启动测试代码
+        */
+        // return user;
+
+        /*
+            参数校验测试代码
+        */
+        /*if (bindingResult.hasErrors()) {
+            String errorMessage = bindingResult.getFieldErrors()
+                    .stream()
+                    .map(FieldError::getDefaultMessage)
+                    .collect(Collectors.joining("，"));
+
+            return ResponseEntity.badRequest().body(errorMessage);
+        }
+
+        return ResponseEntity.ok("参数没有任何问题");*/
+
+        /*
+            自定义响应工具类测试代码
+        */
+        /*if (bindingResult.hasErrors()) {
+            String errorMessage = bindingResult.getFieldErrors()
+                    .stream()
+                    .map(FieldError::getDefaultMessage)
+                    .collect(Collectors.joining("，"));
+
+            return Response.fail(errorMessage);
+        }
+        return Response.success(user);*/
+
+        /*
+            自定义业务异常测试代码
+        */
+        /*throw new BizException(ResponseCodeEnum.PRODUCT_NOT_FOUND);*/
+
+        /*
+            运行时异常测试代码
+        */
+        /*int i = 1 / 0;
+        return Response.success();*/
+
+        /*
+            全局处理参数校验异常测试代码：去除参数BindingResult
+        */
+        return Response.success();
+    }
+}
+
+```
+
+重启项目，调用`/test`接口，查看返回结果：
+
+入参：
+
+```json
+{
+    "username": "",
+    "sex": null,
+    "age": 128,
+    "email": "lm1md22yahoo.cn"
+}
+```
+
+出参：
+
+```json
+{
+    "success": false,
+    "message": "email 邮箱格式不正确，当前值：’lm1md22yahoo.cn'；sex 性别不能为空，当前值：’null'；age 年龄必须在18到100岁之间，当前值：’128'；username 用户名不能为空，当前值：’'；",
+    "code": "10001",
+    "data": null
+}
+```
+

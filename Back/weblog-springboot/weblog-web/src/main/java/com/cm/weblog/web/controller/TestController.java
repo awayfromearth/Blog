@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 public class TestController {
     @PostMapping("/test")
     @ApiOperationLog(description = "测试接口")
-    public Response<?> test(@RequestBody @Validated User user, BindingResult bindingResult) {
+    public Response<?> test(@RequestBody @Validated User user) {
         /*
             项目初始化启动测试代码
         */
@@ -63,7 +63,12 @@ public class TestController {
         /*
             运行时异常测试代码
         */
-        int i = 1 / 0;
+        /*int i = 1 / 0;
+        return Response.success();*/
+
+        /*
+            全局处理参数校验异常测试代码：去除参数BindingResult
+        */
         return Response.success();
     }
 }
