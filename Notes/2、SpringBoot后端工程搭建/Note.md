@@ -1663,3 +1663,200 @@ public class TestController {
 }
 ```
 
+## 十、整合接口调试工具Knife4j
+
+### 10.1、引入依赖
+
+在`weblog-springboot`模块的`pom.xmL`中添加版本信息：
+
+```xml
+<knife4j.version>4.3.0</knife4j.version>
+
+... 省略
+<!-- knife4j （API 文档工具） -->
+<dependency>
+	<groupId>com.github.xiaoymin</groupId>
+    <artifactId>knife4j-openapi2-spring-boot-starter</artifactId>
+    <version>${knife4j.version}</version>
+</dependency>
+```
+
+本项目在前台后台模块都需要用到Knife4j调试接口，在`weblog-web`及`weblog-module-admin`模块的`pom.xml`中都需要引入依赖
+
+```xml
+<!-- knife4j （API 文档工具） -->
+<dependency>
+	<groupId>com.github.xiaoymin</groupId>
+    <artifactId>knife4j-openapi2-spring-boot-starter</artifactId>
+</dependency>
+```
+
+### 10.2、分组配置类
+
+在`weblog-web`模块中新建包`config`用于统一放置配置类，在该包下新建`Knife4jConfig`配置类：
+
+```java
+package com.cm.weblog.web.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import springfox.documentation.builders.ApiInfoBuilder;
+import springfox.documentation.builders.PathSelectors;
+import springfox.documentation.builders.RequestHandlerSelectors;
+import springfox.documentation.service.ApiInfo;
+import springfox.documentation.service.Contact;
+import springfox.documentation.spi.DocumentationType;
+import springfox.documentation.spring.web.plugins.Docket;
+import springfox.documentation.swagger2.annotations.EnableSwagger2WebMvc;
+
+@Configuration
+@EnableSwagger2WebMvc
+public class Knife4jConfig {
+    @Bean("webApi")
+    public Docket createApiDoc() {
+        return new Docket(DocumentationType.SWAGGER_2)
+                .apiInfo(buildApiInfo())
+                .groupName("Web 前台接口")
+                .select()
+                .apis(RequestHandlerSelectors.basePackage("com.cm.weblog.web.controller"))
+                .paths(PathSelectors.any())
+                .build();
+    }
+
+    private ApiInfo buildApiInfo() {
+        return new ApiInfoBuilder()
+                .title("Weblog 博客前台接口文档")
+                .description("Weblog 是一款由 SpringBoot + Vue 开发的前后端分离博客")
+                .termsOfServiceUrl("http://www.example.com") // API服务条款
+                .contact(new Contact("CM", "https://www.example.com", "example@xxx.com"))
+                .version("1.0")
+                .build();
+    }
+}
+
+```
+
+在`weblog-module-admin`模块中同样新建配置类`Knife4jAdminConfig`并修改相关配置信息：
+
+```java
+package com.cm.weblog.admin.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import springfox.documentation.builders.ApiInfoBuilder;
+import springfox.documentation.builders.PathSelectors;
+import springfox.documentation.builders.RequestHandlerSelectors;
+import springfox.documentation.service.ApiInfo;
+import springfox.documentation.service.Contact;
+import springfox.documentation.spi.DocumentationType;
+import springfox.documentation.spring.web.plugins.Docket;
+import springfox.documentation.swagger2.annotations.EnableSwagger2WebMvc;
+
+@Configuration
+@EnableSwagger2WebMvc
+public class Knife4jAdminConfig {
+    @Bean("adminApi")
+    public Docket createApiDoc() {
+        return new Docket(DocumentationType.SWAGGER_2)
+                .apiInfo(buildApiInfo())
+                .groupName("Admin 后台接口")
+                .select()
+                .apis(RequestHandlerSelectors.basePackage("com.cm.weblog.web.admin.controller"))
+                .paths(PathSelectors.any())
+                .build();
+    }
+
+    private ApiInfo buildApiInfo() {
+        return new ApiInfoBuilder()
+                .title("Weblog 博客后台接口文档")
+                .description("Weblog 是一款由 SpringBoot + Vue 开发的前后端分离博客")
+                .termsOfServiceUrl("http://www.example.com") // API服务条款
+                .contact(new Contact("CM", "https://www.example.com", "example@xxx.com"))
+                .version("1.0")
+                .build();
+    }
+}
+
+```
+
+重启项目，访问`http://localhost:8080/doc.html`，就可以看到接口管理页面了
+
+![](images/21.png)
+
+### 10.3、使用 Swagger 注解标识接口
+
+- 模块名称：`@Api`
+- 接口名称：`@ApiOperation`
+- 类描述：`@ApiModel`
+- 字段描述：`@ApiModelProperty`
+
+给`Controller`添加相关注解：
+
+```java
+// ...省略
+@Api(tags = "首页模块")
+public class TestController {
+    // ...省略
+    @ApiOperation(value = "测试接口")
+    public Response<?> test(@RequestBody @Validated User user) {
+        // ...省略
+    }
+}
+```
+
+给`User`添加相关注解：
+
+```java
+package com.cm.weblog.web.model;
+
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
+
+import javax.validation.constraints.*;
+
+@Data
+@ApiModel(value = "用户实体类")
+public class User {
+    @NotBlank(message = "用户名不能为空")
+    @ApiModelProperty(value = "用户名")
+    private String username;
+
+    @NotNull(message = "性别不能为空")
+    @ApiModelProperty(value = "性别")
+    private Integer sex;
+
+    @NotNull(message = "年龄不能为空")
+    @Min(value = 18, message = "年龄必须在18到100岁之间")
+    @Max(value = 100, message = "年龄必须在18到100岁之间")
+    @ApiModelProperty(value = "年龄")
+    private Integer age;
+
+    @NotBlank(message = "邮箱不能为空")
+    @Email(message = "邮箱格式不正确")
+    @ApiModelProperty(value = "邮箱")
+    private String email;
+}
+
+```
+
+添加完后，管理页面展示如下：
+
+![](images/22.png)
+
+### 10.4、测试效果
+
+重启项目，访问`http://localhost:8080/doc.html`
+
+### 10.5、生产环境屏蔽 Knife4j
+
+```java
+// ... 省略
+@Profile("dev")
+public class Knife4jConfig {
+    // ... 省略
+}
+```
+
+
+
