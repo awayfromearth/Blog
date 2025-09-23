@@ -1865,6 +1865,56 @@ public class Knife4jConfig {
 在 `weblog-module-common` 模块中，新建 `config` 配置包，并创建 `JacksonConfig` 配置类，代码如下：
 
 ```java
+package com.cm.weblog.common.config;
+
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateDeserializer;
+import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer;
+import com.fasterxml.jackson.datatype.jsr310.deser.LocalTimeDeserializer;
+import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer;
+import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
+import com.fasterxml.jackson.datatype.jsr310.ser.LocalTimeSerializer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.TimeZone;
+
+@Configuration
+public class JacksonConfig {
+    @Bean
+    public ObjectMapper objectMapper() {
+        // 初始化一个 ObjectMapper 用于自定义 Jackson
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        // 忽略未知字段（前端传入某个后端未定义接收的字段）
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+        // 指定序列化与反序列化的规则
+        JavaTimeModule javaTimeModule = new JavaTimeModule();
+
+        // 支持三种时间类
+        javaTimeModule.addSerializer(LocalDateTime.class, new LocalDateTimeSerializer(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        javaTimeModule.addDeserializer(LocalDateTime.class, new LocalDateTimeDeserializer(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        javaTimeModule.addSerializer(LocalDate.class, new LocalDateSerializer(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+        javaTimeModule.addDeserializer(LocalDate.class, new LocalDateDeserializer(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+        javaTimeModule.addSerializer(LocalTime.class, new LocalTimeSerializer(DateTimeFormatter.ofPattern("HH:mm:ss")));
+        javaTimeModule.addDeserializer(LocalTime.class, new LocalTimeDeserializer(DateTimeFormatter.ofPattern("HH:mm:ss")));
+
+        objectMapper.registerModule(javaTimeModule);
+
+        // 时区
+        objectMapper.setTimeZone(TimeZone.getTimeZone("Asia/Shanghai"));
+
+        return objectMapper;
+    }
+}
+
 ```
 
 ### 11.2、测试
@@ -1872,21 +1922,93 @@ public class Knife4jConfig {
 在`User`类中添加三个字段，测试三种日期类的序列化、反序列化
 
 ```java
+// 测试 Jackson 日期序列化及反序列化配置
+private LocalDateTime createTime;
+private LocalDate updateDate;
+private LocalTime time;
 ```
 
 修改`/test`接口设置三种日期字段值：
 
 ```java
+package com.cm.weblog.web.controller;
+
+import com.cm.weblog.common.aspect.ApiOperationLog;
+import com.cm.weblog.common.enums.ResponseCodeEnum;
+import com.cm.weblog.common.exception.BizException;
+import com.cm.weblog.common.utils.JsonUtil;
+import com.cm.weblog.common.utils.Response;
+import com.cm.weblog.web.model.User;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.stream.Collectors;
+
+/**
+ * 测试请求类
+ */
+@RestController
+@Slf4j
+@Api(tags = "首页模块")
+public class TestController {
+    @PostMapping("/test")
+    @ApiOperationLog(description = "测试接口")
+    @ApiOperation(value = "测试接口")
+    public Response<?> test(@RequestBody @Validated User user) {
+        log.info(JsonUtil.toJson(user));
+
+        user.setCreateTime(LocalDateTime.now());
+        user.setUpdateDate(LocalDate.now());
+        user.setTime(LocalTime.now());
+
+        return Response.success(user);
+    }
+}
+
 ```
 
 重启项目，请求`/test`接口
 
 入参：
 
-```jason
+```json
+{
+    "username": "来一全",
+    "sex": 1,
+    "age": 100,
+    "email": "hvbk3d_ghj14@139.com",
+    "createTime": "2025-09-22 21:31:48",
+    "updateDate": "2025-09-22",
+    "time": "21:31:57"
+}
 ```
 
 出参：
 
 ```json
+{
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": {
+        "username": "来一全",
+        "sex": 1,
+        "age": 100,
+        "email": "hvbk3d_ghj14@139.com",
+        "createTime": "2025-09-23 21:29:03",
+        "updateDate": "2025-09-23",
+        "time": "21:29:03"
+    }
+}
 ```
