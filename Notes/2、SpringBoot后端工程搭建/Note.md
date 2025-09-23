@@ -1858,5 +1858,35 @@ public class Knife4jConfig {
 }
 ```
 
+## 十一、配置 JackSon 支持日期各格式的序列化及反序列化
 
+### 11.1、自定义 Jackson 配置类
 
+在 `weblog-module-common` 模块中，新建 `config` 配置包，并创建 `JacksonConfig` 配置类，代码如下：
+
+```java
+```
+
+### 11.2、测试
+
+在`User`类中添加三个字段，测试三种日期类的序列化、反序列化
+
+```java
+```
+
+修改`/test`接口设置三种日期字段值：
+
+```java
+```
+
+重启项目，请求`/test`接口
+
+入参：
+
+```jason
+```
+
+出参：
+
+```json
+```
