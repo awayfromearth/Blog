@@ -348,6 +348,7 @@ body {
     font-size: 16px;
     background: #f4f4f4;
     line-height: 1.6;
+    overflow: hidden;
 }
 ```
 
