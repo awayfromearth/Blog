@@ -175,3 +175,206 @@ import "animate.css"
   </div>
 </div>
 ```
+
+## 二、整合 MybatisPlus
+
+### 2.1、连接数据库新建数据表
+
+命令行运行：
+
+```cmd
+net start mysql90
+```
+
+> 关闭数据库的命令：
+>
+> ```cmd
+> net stop mysql90
+> ```
+
+打开`Navicat`连接数据库：
+
+![](images/3.png)
+
+![](images/4.png)
+
+新建一个数据库：
+
+![](images/5.png)
+
+新建查询语句，执行如下的建表语句：
+
+```sql
+CREATE TABLE `t_user` (
+	`id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'id',
+	`username` VARCHAR(60) NOT NULL COMMENT '用户名',
+	`password` VARCHAR(60) NOT NULL COMMENT '密码',
+	`create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+	`update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间',
+	`is_deleted` TINYINT(2) NOT NULL DEFAULT '0' COMMENT '逻辑删除：0：未删除；1：已删除',
+	PRIMARY KEY (`id`) USING BTREE,
+	UNIQUE KEY `uk_username` (`username`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
+```
+
+### 2.2、添加依赖
+
+在`weblog-springbbot`的`pom.xml`文件中声明版本及依赖：
+
+```xml
+<properties>
+	<!-- 省略 -->
+    <mybatis-plus.version>3.5.2</mybatis-plus.version>
+</properties>
+
+<dependencies>
+	<!-- 省略 -->
+    <!-- Mybatis Plus -->
+    <dependency>
+    	<groupId>com.baomidou</groupId>
+        <artifactId>mybatis-plus-boot-starter</artifactId>
+        <version>${mybatis-plus.version</version>
+    </dependency>
+</dependencies>
+```
+
+在`weblog-module-common`模块中引入`MybatisPlus`以及`MySQL`依赖：
+
+```xml
+<dependencies>
+	<!-- 省略 -->
+    <!-- Mybatis Plus -->
+    <dependency>
+    	<groupId>com.baomidou</groupId>
+        <artifactId>mybatis-plus-boot-starter</artifactId>
+    </dependency>
+    
+    <!-- MySQL -->
+    <dependency>
+    	<groupId>mysql</groupId>
+        <artifactId>mysql-connector-java</artifactId>
+    </dependency>
+</dependencies>
+```
+
+### 2.3、添加配置
+
+编辑`application-dev.yml`，添加数据库连接及连接池相关配置：
+
+```yml
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/weblog?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&useSSL=false&zeroDateTimeBehavior=convertToNull
+    username: root
+    password: admin123456
+    hikari:
+      minimum-idle: 5 # 最小空闲连接数
+      maximum-pool-size: 20 # 连接池最大允许连接数
+      auto-commit: true # 自动提交事务
+      idle-timeout: 30000 # 连接闲置最长时间（超过这个时间会被释放）
+      pool-name: Weblog-HikariCP # 连接池命名
+      max-lifetime: 1800000 # 连接在连接池最大存活时间（超过这个时间会被强制关闭）
+      connection-timeout: 30000 # 连接超时时间
+      connection-test-query: SELECT 1 # 测试连接是否可用
+```
+
+在`weblog-module-common`模块中的`config`包下，新建一个`MybatisPlusConfig`配置类：
+
+```java
+package com.cm.weblog.common.config;
+
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+@MapperScan("com.cm.weblog.common.domain.mapper")
+public class MybatisPlusConfig {
+}
+
+```
+
+- `@MpperScan`：指定要扫描的位置，即`mapper`接口存放的位置（数据库相关的代码统一放置在`/domain`包下），如下图所示：
+
+  ![](images/6.png)
+
+  - `dos`：根据阿里开发规划，数据库对应实体类统一存放此包下
+  - `mapper`：统一放置`mapper`接口文件
+
+### 2.4、尝试新增一条用户记录
+
+在`/dos`包下，新建一个`UserDO`类与数据库中的字段对应：
+
+```java
+package com.cm.weblog.common.domain.dos;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.Date;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+@TableName("t_user")
+public class UserDO {
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    
+    private String username;
+    
+    private String password;
+    
+    private Date createTime;
+    
+    private Date updateTime;
+    
+    private Boolean isDeleted;
+}
+
+```
+
+新建`Mapper`接口——在`mapper`包中，创建一个`UserMapper`接口，代码如下：
+
+```java
+package com.cm.weblog.common.domain.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.cm.weblog.common.domain.dos.UserDO;
+
+public interface UserMapper extends BaseMapper<UserDO> {
+}
+
+```
+
+在`weblog-web`模块的单侧中新增一个测试方法，往数据库新增一条用户记录：
+
+```java
+@Autowired
+private UserMapper userMapper;
+    
+@Test
+void insertTest() {
+	// 构建数据库实体类
+	UserDO userDO = UserDO.builder()
+			.username("admin")
+			.password("123456")
+			.createTime(new Date())
+			.updateTime(new Date())
+			.isDeleted(false)
+			.build();
+        
+	userMapper.insert(userDO);
+}
+```
+
+运行测试方法，查看数据库：
+
+![](images/7.png)
+
