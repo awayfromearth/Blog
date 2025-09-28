@@ -378,3 +378,100 @@ void insertTest() {
 
 ![](images/7.png)
 
+## 三、整合 P6spy 组件
+
+### 3.1、添加依赖
+
+在`weblog-springboot`模块中声明依赖以及版本号：
+
+```xml
+<properties>
+	<!-- 省略 -->
+    <p6spy.version>3.9.1</p6spy.version>
+</properties>
+
+<dependencies>
+	<!-- 省略 -->
+    <dependency>
+    	<groupId>p6spy</groupId>
+        <artifactId>p6spy</artifactId>
+        <version>${p6spy.version}</version>
+    </dependency>
+</dependencies>
+```
+
+在`weblog-module-common`模块中引入依赖：
+
+```xml
+<dependency>
+	<groupId>p6spy</groupId>
+	<artifactId>p6spy</artifactId>
+</dependency>
+```
+
+### 3.2、添加配置
+
+修改`application-dev.yml`，将驱动类修改为`p6spy`提供的驱动类；将数据库地址前缀修改为`jdbc:p6spy`：
+
+```yml
+spring:
+	datasource:
+		driver-class-name: com.p6spy.engine.spy.P6SpyDriver
+		url: jdbc:p6spy:mysql://127.0.0.1:3306/weblog?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&useSSL=false&zeroDateTimeBehavior=convertToNull
+		# ... 省略
+```
+
+在`weblog-web`模块的`resources`目录下添加`spy.properties`文件，内容如下：
+
+```properties
+modulelist=com.baomidou.mybatisplus.extension.p6spy.MybatisPlusLogFactory,com.p6spy.engine.outage.P6OutageFactory
+# 自定义打印日志
+logMessageFormat=com.baomidou.mybatisplus.extension.p6spy.P6SpyLogger
+# 输出日志到控制台
+appender=com.baomidou.mybatisplus.extension.p6spy.StdoutLogger
+# 设置 p6spy driver 代理
+deregisterdrivers=true
+# JDBC 前缀
+usePrefix=true
+# 配置可去掉的结果集
+excludecategories=info,debug,result,commit,resultset
+# 日期格式
+dateformat=yyyy-MM-dd HH:mm:ss
+# 开启慢 SQL 记录
+outagedetection=true
+# 慢 SQL 记录标准 2 秒
+outagedetactioninterval=2
+```
+
+### 3.3、测试打印完整的 SQL 语句以及耗时
+
+删除`t_user`表中数据，再次运行上节中的`insertTest`方法，查看效果：
+
+![](images/8.png)
+
+### 备注：生产环境不要启用
+
+即`application-prod.yml`中数据库连接的配置仍然使用原来的：
+
+```yml
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/weblog?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&useSSL=false&zeroDateTimeBehavior=convertToNull
+    username: root
+    password: admin123456
+    hikari:
+      minimum-idle: 5 # 最小空闲连接数
+      maximum-pool-size: 20 # 连接池最大允许连接数
+      auto-commit: true # 自动提交事务
+      idle-timeout: 30000 # 连接闲置最长时间（超过这个时间会被释放）
+      pool-name: Weblog-HikariCP # 连接池命名
+      max-lifetime: 1800000 # 连接在连接池最大存活时间（超过这个时间会被强制关闭）
+      connection-timeout: 30000 # 连接超时时间
+      connection-test-query: SELECT 1 # 测试连接是否可用
+      
+# 日志
+logging:
+  config: classpath:logback-weblog.xml
+```
+
