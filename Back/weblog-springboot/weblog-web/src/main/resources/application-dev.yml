@@ -13,3 +13,8 @@ spring:
       max-lifetime: 1800000 # 连接在连接池最大存活时间（超过这个时间会被强制关闭）
       connection-timeout: 30000 # 连接超时时间
       connection-test-query: SELECT 1 # 测试连接是否可用
+
+  security:
+    user:
+      name: admin
+      password: 123456

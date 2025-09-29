@@ -475,3 +475,142 @@ logging:
   config: classpath:logback-weblog.xml
 ```
 
+## 四、整合 Spring Security
+
+### 4.1、新建 weblog-module-jwt 模块
+
+参考之前创建模块的方式，创建一个`weblog-module-jwt`模块，放置`jwt`相关功能代码
+
+创建成功后，删除一些无用的文件、文件夹，最终目录如下：
+
+![](images/9.png)
+
+修改`pom.xml`文件内容：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.cm</groupId>
+        <artifactId>weblog-springboot</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <artifactId>weblog-module-jwt</artifactId>
+    <name>weblog-module-jwt</name>
+    <description>weblog-module-jwt（JWT 模块：管理用户认证、鉴权）</description>
+
+    <dependencies>
+       <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>
+
+```
+
+在父项目`weblog-springboot`中引入模块
+
+```xml
+<modules>
+	<!-- 省略 -->
+    <module>weblog-module-jwt</module>
+</modules>
+
+<dependencies>
+    <!-- 省略 -->
+	<dependency>
+    	<groupId>com.cm</groupId>
+        <artifactId>weblog-module-jwt</artifactId>
+        <version>${revision}</version>
+    </dependency>
+</dependencies>
+```
+
+在`weblog-module-admin`模块中引入——认证、鉴权功能只在`Admin`后台中需要：
+
+```xml
+<!-- 省略 -->
+<dependency>
+	<groupId>com.cm</groupId>
+	<artifactId>weblog-module-jwt</artifactId>
+</dependency>
+```
+
+### 4.2、添加依赖
+
+在`weblog-module-admin`和`weblog-module-jwt`模块中添加`security`依赖：
+
+```xml
+<!-- 省略 -->
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-security</artifactId>
+</dependency>
+```
+
+### 4.3、自定义 Security 配置
+
+在`weblog-module-admin`模块的`config`包下新建一个`WebSecurityConfig`配置类：
+
+```java
+package com.cm.weblog.admin.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+
+/**
+ * Spring Security 配置类
+ */
+@Configuration
+@EnableWebSecurity
+public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http.authorizeRequests()
+                .mvcMatchers("/admin/**").authenticated() // 所有以 /admin 开头的接口需要认证
+                .anyRequest().permitAll() // 其它接口放行，无需认证
+                .and()
+                .formLogin() // 使用表单登录
+                .and()
+                .httpBasic(); // 使用 HTTP Basic 认证
+    }
+}
+
+```
+
+### 4.4、测试
+
+在`application-dev.yml`文件中自定义测试用的登录用户名和密码：
+
+```yml
+spring:
+	# 省略...
+	security:
+		user:
+			name: admin
+			password: 123456
+```
+
+将之前的`/test`接口修改为`/admin/test`接口，重启项目，访问 http://localhost:8080/admin/test，结果如下：
+
+![](images/10.png)
+
+接口被拦截了兵跳转到了`security`包默认的登录页，输入之前设置的用户名、密码后，能够正常访问接口：
+
+![](images/11.png)
+
+> 虽然接口返回错误信息，但这是因为以`GET`访问了`POST`接口，与本节的需求没有关系。从测试结果来说，接口被正常拦截在登录后也能被正常访问，测试成功。

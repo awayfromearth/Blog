@@ -28,6 +28,8 @@
         <module>weblog-module-admin</module>
         <!-- 通用模块 -->
         <module>weblog-module-common</module>
+        <!-- JWT 模块 -->
+        <module>weblog-module-jwt</module>
     </modules>
 
     <!-- 版本号统一管理 -->
@@ -63,6 +65,12 @@
             <dependency>
                 <groupId>com.cm</groupId>
                 <artifactId>weblog-module-common</artifactId>
+                <version>${revision}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.cm</groupId>
+                <artifactId>weblog-module-jwt</artifactId>
                 <version>${revision}</version>
             </dependency>
 
