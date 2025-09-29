@@ -233,7 +233,7 @@ CREATE TABLE `t_user` (
     <dependency>
     	<groupId>com.baomidou</groupId>
         <artifactId>mybatis-plus-boot-starter</artifactId>
-        <version>${mybatis-plus.version</version>
+        <version>${mybatis-plus.version}</version>
     </dependency>
 </dependencies>
 ```
