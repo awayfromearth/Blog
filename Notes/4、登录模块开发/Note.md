@@ -1136,7 +1136,7 @@ public class RestAuthenticationFailureHandler implements AuthenticationFailureHa
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response, AuthenticationException exception) throws IOException, ServletException {
       log.warn("AuthenticationException: ", exception);
       
-      if (exception instanceof UsernameNotFoundException) {
+      if (exception instanceof UsernameOrPasswordNullException) {
           ResultUtil.fail(response, Response.fail(exception.getMessage()));
           return;
       } else if (exception instanceof BadCredentialsException) {
