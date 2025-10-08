@@ -889,7 +889,7 @@ package com.cm.weblog.jwt.exception;
 import org.springframework.security.core.AuthenticationException;
 
 /**
- * 自定义用户名或密码为恐异常
+ * 自定义用户名或密码为空异常
  */
 public class UsernameOrPasswordNullException extends AuthenticationException {
     public UsernameOrPasswordNullException(String msg) {
