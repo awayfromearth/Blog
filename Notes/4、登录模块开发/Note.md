@@ -742,7 +742,7 @@ public class JwtTokenHelper implements InitializingBean {
      */
     @Override
     public void afterPropertiesSet() throws Exception {
-        jwtParser = Jwts.parserBuilder().requireAudience(issuer)
+        jwtParser = Jwts.parserBuilder().requireIssuer(issuer)
                 .setSigningKey(key).setAllowedClockSkewSeconds(10)
                 .build();
     }
@@ -1400,3 +1400,564 @@ public class UserDetailServiceImpl implements UserDetailsService {
 ```
 
 重启项目，再次测试登录接口
+
+## 六、Spring Security 整合 JWT 实现接口鉴权
+
+### 6.1、新增校验失败的处理器
+
+首先在`ResponseCodeEnum`中添加枚举：
+
+```java
+UNAUTHORIZED("20002", "无访问权限，请先登录！")
+```
+
+在`handler`包中新增`RestAuthenticationEntryPoint`处理器，处理用户未登录却在访问受保护资源的情况：
+
+```java
+package com.cm.weblog.jwt.handler;
+
+import com.cm.weblog.common.enums.ResponseCodeEnum;
+import com.cm.weblog.common.utils.Response;
+import com.cm.weblog.jwt.utils.ResultUtil;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.stereotype.Component;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+/**
+ * 未登录处理器
+ */
+@Slf4j
+@Component
+public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
+    @Override
+    public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException) throws IOException, ServletException {
+        log.warn("用户未登录时访问受保护的资源：", authException);
+        
+        if (authException instanceof InsufficientAuthenticationException) {
+            ResultUtil.fail(response, HttpStatus.UNAUTHORIZED.value(), Response.fail(ResponseCodeEnum.UNAUTHORIZED));
+            return;
+        }
+        
+        ResultUtil.fail(response, HttpStatus.UNAUTHORIZED.value(), Response.fail(authException.getMessage()));
+    }
+}
+
+```
+
+以及新增`RestAccessDeniedHandler`处理器，处理用户已登录后访问受保护的资源但权限不够的情况：
+
+```java
+package com.cm.weblog.jwt.handler;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.stereotype.Component;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+/**
+ * 用户权限不足处理器
+ */
+@Slf4j
+@Component
+public class RestAccessDeniedHandler implements AccessDeniedHandler {
+    @Override
+    public void handle(HttpServletRequest request, HttpServletResponse response, AccessDeniedException accessDeniedException) throws IOException, ServletException {
+        log.warn("该用户暂无权限：", accessDeniedException);
+
+        /*
+        * 预留，目前只有 ADMIN 角色，后续有更多角色时处理
+        * */
+    }
+}
+
+```
+
+### 6.2、新建 Token 校验过滤器
+
+在`JwtTokenHelper`类中添加两个方法：
+
+- 校验`Token`
+- 解析`Token`
+
+```java
+/**
+* 校验 Token 是否可用
+* @param token Token
+*/
+public void validateToken(String token) {
+	jwtParser.parseClaimsJws(token);
+}
+
+/**
+* 根据 Token 获取用户名
+* @param token Token
+* @return 用户名
+*/
+public String getUsernameFromToken(String token) {
+	Claims claims = jwtParser.parseClaimsJws(token).getBody();
+	return claims.getSubject();
+}
+```
+
+在`weblog-module-jwt`模块下的`filter`包中，创建`TokenAuthenticationFilter`过滤器专门校验`Token`，代码如下：
+
+1. 从请求头中获取`Authorization`的值
+2. 是否以`Bearer`开头
+3. 截取`Token`
+4. 判空`Token`以及`Token`是否可用
+5. 从`Token`解析用户名并获取用户详情存入`UsernamePasswordAuthenticationToken`方便后续鉴权
+6. 将`UsernamePasswordAuthenticationToken`存入`ThreadLocal`方便获取用户信息
+7. 继续执行下一个过滤器
+
+```java
+package com.cm.weblog.jwt.filter;
+
+import com.cm.weblog.jwt.utils.JwtTokenHelper;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.UnsupportedJwtException;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.security.authentication.AuthenticationServiceException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import javax.annotation.Resource;
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.Objects;
+
+/**
+ * Token 校验过滤器
+ */
+@Slf4j
+public class TokenAuthenticationFilter extends OncePerRequestFilter {
+    @Resource
+    private JwtTokenHelper jwtTokenHelper;
+
+    @Resource
+    private UserDetailsService userDetailsService;
+
+    @Resource
+    private AuthenticationEntryPoint authenticationEntryPoint;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, @NotNull HttpServletResponse response, @NotNull FilterChain filterChain) throws ServletException, IOException {
+        // 从请求头获取 key 为 Authorization 的值
+        String header = request.getHeader("Authorization");
+
+        // 判断是否以 Bearer 开头
+        if (StringUtils.startsWith(header, "Bearer")) {
+            // 截取 Token
+            String token = StringUtils.substring(header, 7);
+            log.info("token: {}", token);
+
+            // 判空
+            if (StringUtils.isNotBlank(token)) {
+                try {
+                    jwtTokenHelper.validateToken(token);
+                } catch (MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
+                    authenticationEntryPoint.commence(request, response, new AuthenticationServiceException("Token 不可用"));
+                    return;
+                } catch (ExpiredJwtException e) {
+                    authenticationEntryPoint.commence(request, response, new AuthenticationServiceException("Token 已失效"));
+                    return;
+                }
+
+                String username = jwtTokenHelper.getUsernameFromToken(token);
+
+                if (StringUtils.isNotBlank(username) && Objects.isNull(SecurityContextHolder.getContext().getAuthentication())) {
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                }
+            }
+        }
+
+        // 继续执行下一个过滤器
+        filterChain.doFilter(request, response);
+    }
+}
+
+```
+
+### 6.3、整合配置
+
+将上述新增的过滤器与处理器整合到`Spring Security`的配置类`WebSecurityConfig`中：
+
+```java
+package com.cm.weblog.admin.config;
+
+import com.cm.weblog.jwt.config.JwtAuthenticationSecurityConfig;
+import com.cm.weblog.jwt.filter.TokenAuthenticationFilter;
+import com.cm.weblog.jwt.handler.RestAccessDeniedHandler;
+import com.cm.weblog.jwt.handler.RestAuthenticationEntryPoint;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+import javax.annotation.Resource;
+
+/**
+ * Spring Security 配置类
+ */
+@Configuration
+@EnableWebSecurity
+public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
+    @Resource
+    private JwtAuthenticationSecurityConfig jwtAuthenticationSecurityConfig;
+    
+    @Resource
+    private RestAuthenticationEntryPoint restAuthenticationEntryPoint;
+    
+    @Resource
+    private RestAccessDeniedHandler restAccessDeniedHandler;
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http.csrf().disable() // 禁用 csrf
+                .formLogin().disable()// 禁用表单登录
+                .apply(jwtAuthenticationSecurityConfig) // 设置用户登录认证相关配置
+              .and()
+                .authorizeRequests()
+                .mvcMatchers("/admin/**").authenticated() // 所有以 /admin 开头的接口需要认证
+                .anyRequest().permitAll() // 其它接口放行，无需认证
+              .and()
+                .httpBasic().authenticationEntryPoint(restAuthenticationEntryPoint)
+              .and()
+                .exceptionHandling().accessDeniedHandler(restAccessDeniedHandler)
+              .and()
+                .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+              .and()
+                .addFilterBefore(tokenAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+    }
+    
+    @Bean
+    public TokenAuthenticationFilter tokenAuthenticationFilter() {
+        return new TokenAuthenticationFilter();
+    }
+}
+
+```
+
+提取相关变量到配置文件中
+
+修改`application.yml`配置文件如下：
+
+```yml
+spring:
+  profiles:
+    active: '@env@'
+
+jwt:
+  # 签发人
+  issuer: CM
+  # 秘钥
+  secret: JUjN5GvIe/mc04kQA7I4Iy5CtroT5zUsYM29Iyu3RwYcpdh/ZcaYcJBDHrUuQINcyxuOiKX3prlNmuc7Y0868g==
+  # Token 过期时间（分钟）
+  tokenExpireTime: 1440
+  # Token 请求头 key 值
+  tokenHeaderKey: Authorization
+  # Token 值前缀
+  tokenPrefix: Bearer
+```
+
+修改`JwtTokenHelper`类如下：
+
+```java
+package com.cm.weblog.jwt.utils;
+
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.CredentialsExpiredException;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Component;
+
+import java.security.Key;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Base64;
+import java.util.Date;
+
+/**
+ * 封装 JWT 相关的功能
+ */
+@Component
+public class JwtTokenHelper implements InitializingBean {
+    // 签发人
+    @Value("${jwt.issuer}")
+    private String issuer;
+
+    // 秘钥
+    private Key key;
+
+    // 解析器
+    private JwtParser jwtParser;
+    
+    // 过期时间
+    @Value("${jwt.tokenExpireTime}")
+    private Long tokenExpireTime;
+
+    /**
+     * 解码 application.yml 配置文件中的 secret 字段 为秘钥
+     * @param base64Key secret 的base64编码
+     */
+    @Value("${jwt.secret}")
+    public void setBase64Key(String base64Key) {
+        key = Keys.hmacShaKeyFor(Base64.getDecoder().decode(base64Key));
+    }
+
+    /**
+     * 初始化解析器
+     * @throws Exception 异常
+     */
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        jwtParser = Jwts.parserBuilder().requireIssuer(issuer)
+                .setSigningKey(key).setAllowedClockSkewSeconds(10)
+                .build();
+    }
+
+    /**
+     * 编译 Token
+     * @param username 用户名
+     * @return 根据用户名加密生成的 Token 且一小时后失效
+     */
+    public String generateToken(String username) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime expireTime = now.plusMinutes(tokenExpireTime);
+
+        return Jwts.builder().setSubject(username)
+                .setIssuer(issuer)
+                .setIssuedAt(Date.from(now.atZone(ZoneId.systemDefault()).toInstant()))
+                .setExpiration(Date.from(expireTime.atZone(ZoneId.systemDefault()).toInstant()))
+                .signWith(key)
+                .compact();
+    }
+
+    /**
+     * 解析 Token
+     * @param token Token
+     * @return 解码 Token 中的信息
+     */
+    public Jws<Claims> parseToken(String token) {
+        try {
+            return jwtParser.parseClaimsJws(token);
+        } catch (SignatureException | MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
+            throw new BadCredentialsException("Token 不可用", e);
+        } catch (ExpiredJwtException e) {
+            throw new CredentialsExpiredException("Token 失效", e);
+        }
+    }
+
+    /**
+     * 校验 Token 是否可用
+     * @param token Token
+     */
+    public void validateToken(String token) {
+        jwtParser.parseClaimsJws(token);
+    }
+
+    /**
+     * 根据 Token 获取用户名
+     * @param token Token
+     * @return 用户名
+     */
+    public String getUsernameFromToken(String token) {
+        Claims claims = jwtParser.parseClaimsJws(token).getBody();
+        return claims.getSubject();
+    }
+
+    /**
+     * 生成一个 Base64 编码的安全秘钥
+     * @return 安全秘钥
+     */
+    private static String generateBase64Key() {
+        Key secretKey = Keys.secretKeyFor(SignatureAlgorithm.HS512);
+
+        return Base64.getEncoder().encodeToString(secretKey.getEncoded());
+    }
+
+    public static void main(String[] args) {
+        String key = generateBase64Key();
+        System.out.println("key: " + key);
+    }
+}
+
+```
+
+修改`TokenAuthenticationFilter`的内容如下：
+
+```java
+package com.cm.weblog.jwt.filter;
+
+import com.cm.weblog.jwt.utils.JwtTokenHelper;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.UnsupportedJwtException;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.AuthenticationServiceException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import javax.annotation.Resource;
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.Objects;
+
+/**
+ * Token 校验过滤器
+ */
+@Slf4j
+public class TokenAuthenticationFilter extends OncePerRequestFilter {
+    @Resource
+    private JwtTokenHelper jwtTokenHelper;
+
+    @Resource
+    private UserDetailsService userDetailsService;
+
+    @Resource
+    private AuthenticationEntryPoint authenticationEntryPoint;
+    
+    @Value("${jwt.tokenPrefix}")
+    private String tokenPrefix;
+    
+    @Value("${jwt.tokenHeaderKey}")
+    private String tokenHeaderKey;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, @NotNull HttpServletResponse response, @NotNull FilterChain filterChain) throws ServletException, IOException {
+        // 从请求头获取 key 为 Authorization 的值
+        String header = request.getHeader(tokenHeaderKey);
+
+        // 判断是否以 Bearer 开头
+        if (StringUtils.startsWith(header, tokenPrefix)) {
+            // 截取 Token
+            String token = StringUtils.substring(header, 7);
+            log.info("token: {}", token);
+
+            // 判空
+            if (StringUtils.isNotBlank(token)) {
+                try {
+                    jwtTokenHelper.validateToken(token);
+                } catch (MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
+                    authenticationEntryPoint.commence(request, response, new AuthenticationServiceException("Token 不可用"));
+                    return;
+                } catch (ExpiredJwtException e) {
+                    authenticationEntryPoint.commence(request, response, new AuthenticationServiceException("Token 已失效"));
+                    return;
+                }
+
+                String username = jwtTokenHelper.getUsernameFromToken(token);
+
+                if (StringUtils.isNotBlank(username) && Objects.isNull(SecurityContextHolder.getContext().getAuthentication())) {
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                }
+            }
+        }
+
+        // 继续执行下一个过滤器
+        filterChain.doFilter(request, response);
+    }
+}
+
+```
+
+### 6.4、测试
+
+重启项目，调用登录接口，获取一个新的`Token`
+
+在请求调试工具中设置全局请求头参数
+
+请求`/admin/test`接口，结果如下：
+
+入参：
+
+```json
+{
+    "username": "宰晨",
+    "sex": 0,
+    "age": 76,
+    "email": "ixjit6.ik1@163.com"
+}
+```
+
+返回：
+
+```json
+{
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": {
+        "username": "宰晨",
+        "sex": 0,
+        "age": 76,
+        "email": "ixjit6.ik1@163.com",
+        "createTime": "2025-10-08 21:40:12",
+        "updateDate": "2025-10-08",
+        "time": "21:40:12"
+    }
+}
+```
+
+故意将`Token`改成错误的，结果如下：
+
+```json
+{
+    "success": false,
+    "message": "Token 不可用",
+    "code": null,
+    "data": null
+}
+```
+

@@ -7,3 +7,9 @@ jwt:
   issuer: CM
   # 秘钥
   secret: JUjN5GvIe/mc04kQA7I4Iy5CtroT5zUsYM29Iyu3RwYcpdh/ZcaYcJBDHrUuQINcyxuOiKX3prlNmuc7Y0868g==
+  # Token 过期时间（分钟）
+  tokenExpireTime: 1440
+  # Token 请求头 key 值
+  tokenHeaderKey: Authorization
+  # Token 值前缀
+  tokenPrefix: Bearer

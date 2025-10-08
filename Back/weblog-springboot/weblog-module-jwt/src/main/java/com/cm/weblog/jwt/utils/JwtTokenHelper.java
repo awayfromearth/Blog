@@ -7,6 +7,7 @@ import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.CredentialsExpiredException;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
@@ -21,7 +22,7 @@ import java.util.Date;
 @Component
 public class JwtTokenHelper implements InitializingBean {
     // 签发人
-    @Value("${jwt.issuer")
+    @Value("${jwt.issuer}")
     private String issuer;
 
     // 秘钥
@@ -29,6 +30,10 @@ public class JwtTokenHelper implements InitializingBean {
 
     // 解析器
     private JwtParser jwtParser;
+
+    // 过期时间
+    @Value("${jwt.tokenExpireTime}")
+    private Long tokenExpireTime;
 
     /**
      * 解码 application.yml 配置文件中的 secret 字段 为秘钥
@@ -45,7 +50,7 @@ public class JwtTokenHelper implements InitializingBean {
      */
     @Override
     public void afterPropertiesSet() throws Exception {
-        jwtParser = Jwts.parserBuilder().requireAudience(issuer)
+        jwtParser = Jwts.parserBuilder().requireIssuer(issuer)
                 .setSigningKey(key).setAllowedClockSkewSeconds(10)
                 .build();
     }
@@ -57,7 +62,7 @@ public class JwtTokenHelper implements InitializingBean {
      */
     public String generateToken(String username) {
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime expireTime = now.plusHours(1);
+        LocalDateTime expireTime = now.plusMinutes(tokenExpireTime);
 
         return Jwts.builder().setSubject(username)
                 .setIssuer(issuer)
@@ -80,6 +85,24 @@ public class JwtTokenHelper implements InitializingBean {
         } catch (ExpiredJwtException e) {
             throw new CredentialsExpiredException("Token 失效", e);
         }
+    }
+
+    /**
+     * 校验 Token 是否可用
+     * @param token Token
+     */
+    public void validateToken(String token) {
+        jwtParser.parseClaimsJws(token);
+    }
+
+    /**
+     * 根据 Token 获取用户名
+     * @param token Token
+     * @return 用户名
+     */
+    public String getUsernameFromToken(String token) {
+        Claims claims = jwtParser.parseClaimsJws(token).getBody();
+        return claims.getSubject();
     }
 
     /**
