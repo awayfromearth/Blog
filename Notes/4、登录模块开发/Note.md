@@ -1961,3 +1961,187 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
 }
 ```
 
+## 七、前端请求 /login 接口以及配置跨域
+
+### 7.1、安装Axios
+
+```shell
+pnpm i axios
+```
+
+### 7.2、创建 Axios 实例
+
+在`src`目录下创建文件`axios.js`文件，配置内容如下：
+
+```js
+import axios from "axios"
+
+// 创建 Axios 实例
+const instance = axios.create({
+  baseURL: "/api", // 你的 API 基础 URL
+  timeout: 7000, // 请求超时时间
+})
+
+// 暴露出去
+export default instance
+```
+
+### 7.3、封装请求
+
+在`src`目录下创建`api`文件夹，在该文件夹下新建两个文件夹：
+
+- `admin`：管理后台相关接口
+- `frontend`：管理前台相关接口
+
+在`admin`文件夹下创建`user.js`，统一放置用户相关接口，目前只有登录，内容如下：
+
+```js
+import axios from "@/axios"
+
+// 登录接口
+export function login(username, password) {
+  return axios.post("/login", {username, password})
+}
+```
+
+### 7.4、配置代理发送请求
+
+在`vite.config.js`配置代理解决跨域问题：
+
+```js
+export default defineConfig({
+  server: {
+    proxy: {
+      "/api": {
+        target: "http://localhost:8080",
+        ws: true,
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, "")
+      },
+    }
+  },
+	// 省略...
+})
+```
+
+给登录页的表单绑定响应式对象，点击登录按钮发送登录请求：
+
+```vue
+<script setup>
+import { User, Lock } from "@element-plus/icons-vue"
+import { reactive } from "vue"
+import { login } from "@/api/admin/user"
+
+const loginForm = reactive({
+  username: "",
+  password: ""
+})
+
+async function onsubmit() {
+  try {
+    const { data } = await login(loginForm)
+    console.log(data)
+  } catch(e) {
+    console.log(e)
+  }
+}
+</script>
+
+<template>
+  <div class="grid grid-cols-2 h-screen">
+    <!-- 默认占两列，order 用于指定排列顺序，md 用于适配非移动端（PC 端） -->
+    <div class="col-span-2 order-2 p-10 md:col-span-1 md:order-1 bg-slate-900">
+      <!-- 指定为 flex 布局，并设置为屏幕垂直水平居中，高度为 100% -->
+      <div class="flex justify-center items-center h-full flex-col animate__animated animate__bounceInLeft animate__fast">
+        <h2 class="font-bold text-4xl mb-7 text-white">Weblog 博客登录</h2>
+        <p class="text-white">一款由 Spring Boot + Mybaits Plus + Vue 3.2 + Vite 4 开发的前后端分离博客。</p>
+        <!-- 指定图片宽度为父级元素的 1/2 -->
+        <img src="@/assets/images/developer.png" class="w-1/2" alt="developer" />
+      </div>
+    </div>
+    <div class="col-span-2 order-1 md:col-span-1 md:order-2 bg-white">
+      <div class="flex justify-center items-center h-full flex-col animate__animated animate__bounceInRight animate__fast">
+        <!-- 大标题，设置字体粗细、大小、下边距 -->
+        <h1 class="font-bold text-4xl mb-5">欢迎回来</h1>
+        <!-- 设置 flex 布局，内容垂直水平居中，文字颜色，以及子内容水平方向 x 轴间距 -->
+        <div class="flex items-center justify-center mb-7 text-gray-400 space-x-2">
+          <!-- 左边横线，高度为 1px, 宽度为 16，背景色设置 -->
+          <span class="h-[1px] w-16 bg-gray-200"></span>
+          <span>账号密码登录</span>
+          <!-- 右边横线 -->
+          <span class="h-[1px] w-16 bg-gray-200"></span>
+        </div>
+        <!-- 引入 Element Plus 表单组件，移动端设置宽度为 5/6，PC 端设置为 2/5 -->
+        <el-form class="w-5/6 md:w-2/5">
+          <el-form-item>
+            <!-- 输入框组件 -->
+            <el-input v-model="loginForm.username" size="large" placeholder="请输入用户名" :prefix-icon="User" clearable/>
+          </el-form-item>
+          <el-form-item>
+            <!-- 密码框组件 -->
+            <el-input v-model="loginForm.password" size="large" type="password" placeholder="请输入密码" :prefix-icon="Lock" clearable/>
+          </el-form-item>
+          <el-form-item>
+            <!-- 登录按钮，宽度设置为 100% -->
+            <el-button class="w-full" size="large" type="primary" @click="onsubmit">登录</el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+    </div>
+  </div>
+</template>
+```
+
+### 7.5、登录后跳转
+
+在`admin`目录下创建`index.vue`，表示登录后的首页，目前先不添加内容，后续再完善：
+
+```vue
+<template>
+    <div>
+        后台首页
+    </div>
+</template>
+```
+
+在路由中添加：
+
+```js
+import AdminIndex from "@/pages/admin/index.vue"
+
+const routes = [
+    // 省略...
+    {
+        path: "/admin/index", // 后台首页
+        component: AdminIndex,
+        meta: {
+            title: "Admin 后台首页"
+        }
+    }
+]
+```
+
+登录成功后通过`router`跳转到首页：
+
+```vue
+<script setup>
+// 省略...
+import { useRouter } from "vue-router"
+
+const router = useRouter()
+
+// 登录
+const onSubmit = () => {
+    login(form.username, form.password).then((res) => {
+        console.log(res)
+        // 判断是否成功
+        if (res.data.success == true) {
+            // 跳转到后台首页
+            router.push("/admin/index")
+        }
+    })
+}
+
+</script>
+```
+
