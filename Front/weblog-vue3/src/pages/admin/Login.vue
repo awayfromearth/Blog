@@ -1,6 +1,6 @@
 <script setup>
 import { User, Lock } from "@element-plus/icons-vue"
-import { reactive } from "vue"
+import { reactive, ref } from "vue"
 import { login } from "@/api/admin/user"
 import { useRouter } from "vue-router"
 
@@ -10,17 +10,38 @@ const loginForm = reactive({
   username: "",
   password: ""
 })
+const rules = {
+  username: [
+    {
+      required: true,
+      message: "用户名不能为空",
+      trigger: "blur"
+    }
+  ],
+  password: [
+    {
+      required: true,
+      message: "密码不能为空",
+      trigger: "blur"
+    }
+  ]
+}
+const loginFormRef = ref()
 
 async function onsubmit() {
-  try {
-    const { data } = await login(loginForm.username, loginForm.password)
-    console.log(data)
-    if (data.success) {
-      router.push("/admin/index")
+  loginFormRef.value.validate(async valid => {
+    if (valid) {
+      try {
+        const { data } = await login(loginForm.username, loginForm.password)
+        console.log(data)
+        if (data.success) {
+          router.push("/admin/index")
+        }
+      } catch(e) {
+        console.log(e)
+      }
     }
-  } catch(e) {
-    console.log(e)
-  }
+  })
 }
 </script>
 
@@ -49,12 +70,12 @@ async function onsubmit() {
           <span class="h-[1px] w-16 bg-gray-200"></span>
         </div>
         <!-- 引入 Element Plus 表单组件，移动端设置宽度为 5/6，PC 端设置为 2/5 -->
-        <el-form class="w-5/6 md:w-2/5">
-          <el-form-item>
+        <el-form ref="loginFormRef" class="w-5/6 md:w-2/5" :model="loginForm" :rules="rules">
+          <el-form-item prop="username">
             <!-- 输入框组件 -->
             <el-input v-model="loginForm.username" size="large" placeholder="请输入用户名" :prefix-icon="User" clearable/>
           </el-form-item>
-          <el-form-item>
+          <el-form-item prop="password">
             <!-- 密码框组件 -->
             <el-input v-model="loginForm.password" size="large" type="password" placeholder="请输入密码" :prefix-icon="Lock" clearable/>
           </el-form-item>
