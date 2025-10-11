@@ -2242,3 +2242,106 @@ async function onsubmit() {
 </template>
 ```
 
+## 九、登录页面优化
+
+### 9.1、登录消息提示
+
+在`utils`目录下新建`message.js`文件用于封装消息提示工具，内容如下：
+
+```js
+export function showMessage(message = "提示内容", type = "success", customClass = "") {
+    return ELMessage({
+        type,
+        message,
+        customClass
+    })
+}
+```
+
+修改`login.vue`内容，引用上述消息工具类
+
+```vue
+<script>
+import { showMessage } from "@/utils/message.js"
+    
+// ...省略
+async function onsubmit() {
+  loginFormRef.value.validate(async valid => {
+    if (valid) {
+      try {
+        const { data } = await login(loginForm.username, loginForm.password)
+        if (data.success) {
+          showMessage("登录成功")
+          router.push("/admin/index")
+        } else {
+          let message = data.message
+          showMessage(message, "error")
+        }
+      } catch(e) {
+        console.log(e)
+        showMessage("登录失败", "error")
+      }
+    }
+  })
+}
+</script>
+```
+
+### 9.2、回车登录
+
+修改`login.vue`文件内容，添加回车事件：
+
+```vue
+<script>
+	function handleKeyUp(e) {
+  		if (e.key === "Enter") {
+    		onsubmit()
+  		}
+	}
+	onMounted(() => {
+  		document.addEventListener("keydown", handleKeyUp)
+	})
+	onBeforeUnmount(() => {
+  		document.removeEventListener("keydown", handleKeyUp)
+	})
+</script>
+```
+
+### 9.3、按钮加载
+
+修改`login.vue`，在请求登录接口时按钮加载：
+
+```vue
+<script>
+    // ...省略
+	const loading = ref(false)
+	async function onsubmit() {
+  	loginFormRef.value.validate(async valid => {
+    	if (valid) {
+      		loading.value = true
+      		try {
+        		const { data } = await login(loginForm.username, loginForm.password)
+        		if (data.success) {
+          			showMessage("登录成功")
+          			router.push("/admin/index")
+        		} else {
+          			let message = data.message
+          			showMessage(message, "error")
+        		}
+      		} catch(e) {
+        		console.log(e)
+        		showMessage("登录失败", "error")
+      		} finally {
+        		loading.value = false
+      		}
+    	}
+  	})
+	}
+</script>
+
+<template>
+	<!-- 省略 -->
+	<el-button :loading="loading" class="w-full" size="large" type="primary" @click="onsubmit">登录</el-button>
+</template>
+```
+

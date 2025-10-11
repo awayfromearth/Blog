@@ -1,8 +1,14 @@
 <script setup>
 import { User, Lock } from "@element-plus/icons-vue"
-import { reactive, ref } from "vue"
+import {
+  reactive,
+  ref,
+  onMounted,
+  onBeforeUnmount
+} from "vue"
 import { login } from "@/api/admin/user"
 import { useRouter } from "vue-router"
+import { showMessage } from "@/utils/message.js"
 
 const router = useRouter()
 
@@ -28,21 +34,41 @@ const rules = {
 }
 const loginFormRef = ref()
 
+const loading = ref(false)
 async function onsubmit() {
   loginFormRef.value.validate(async valid => {
     if (valid) {
+      loading.value = true
       try {
         const { data } = await login(loginForm.username, loginForm.password)
-        console.log(data)
         if (data.success) {
+          showMessage("登录成功")
           router.push("/admin/index")
+        } else {
+          let message = data.message
+          showMessage(message, "error")
         }
       } catch(e) {
         console.log(e)
+        showMessage("登录失败", "error")
+      } finally {
+        loading.value = false
       }
     }
   })
 }
+
+function handleKeyUp(e) {
+  if (e.key === "Enter") {
+    onsubmit()
+  }
+}
+onMounted(() => {
+  document.addEventListener("keydown", handleKeyUp)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener("keydown", handleKeyUp)
+})
 </script>
 
 <template>
@@ -81,7 +107,7 @@ async function onsubmit() {
           </el-form-item>
           <el-form-item>
             <!-- 登录按钮，宽度设置为 100% -->
-            <el-button class="w-full" size="large" type="primary" @click="onsubmit">登录</el-button>
+            <el-button :loading="loading" class="w-full" size="large" type="primary" @click="onsubmit">登录</el-button>
           </el-form-item>
         </el-form>
       </div>
