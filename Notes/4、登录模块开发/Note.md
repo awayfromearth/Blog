@@ -2345,3 +2345,78 @@ async function onsubmit() {
 </template>
 ```
 
+## 10、存储 Token 到 Cookie 中
+
+### 10.1、安装 依赖
+
+```shell
+pnpm i @vueuse/integrations
+pnpm i universal-cookie
+```
+
+### 10.2、封装工具类
+
+在`utils`目录下新建`cookie.js`文件封装`cookie`相关的操作：
+
+- 获取`Token`
+- 存储`Token`
+- 删除`Token`
+
+```js
+import { useCookies } from "@vueuse/integrations/useCookies"
+
+const TOKEN_KEY = "Authorization"
+const cookie = useCookies()
+
+export function getToken() {
+    return cookie.get(TOKEN_KEY)
+}
+
+export function setToken(token) {
+    return cookie.set(TOKEN_KEY, token)
+}
+
+export function removeToken() {
+    return cookie.remove(TOKEN_KEY)
+}
+```
+
+### 10.3、登录成功后存储 Token
+
+修改`login.vue`中`onSubmit`方法，登录成功后存储`Token`到`Cookie`中：
+
+```vue
+<script setup>
+// ...省略
+import { setToken } from "@/utils/cookie.js"
+    
+async function onsubmit() {
+  loginFormRef.value.validate(async valid => {
+    if (valid) {
+      loading.value = true
+      try {
+        const { data } = await login(loginForm.username, loginForm.password)
+        if (data.success) {
+          showMessage("登录成功")
+          let token = data.data.token
+          setToken(token)
+          await router.push("/admin/index")
+        } else {
+          let message = data.message
+          showMessage(message, "error")
+        }
+      } catch(e) {
+        console.log(e)
+        showMessage("登录失败", "error")
+      } finally {
+        loading.value = false
+      }
+    }
+  })
+}
+</script>
+```
+
+登录后可以看到已存储的`Token`：
+
+![](images/12.png)

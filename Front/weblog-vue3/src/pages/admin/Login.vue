@@ -9,6 +9,7 @@ import {
 import { login } from "@/api/admin/user"
 import { useRouter } from "vue-router"
 import { showMessage } from "@/utils/message.js"
+import { setToken } from "@/utils/cookie.js"
 
 const router = useRouter()
 
@@ -43,7 +44,9 @@ async function onsubmit() {
         const { data } = await login(loginForm.username, loginForm.password)
         if (data.success) {
           showMessage("登录成功")
-          router.push("/admin/index")
+          let token = data.data.token
+          setToken(token)
+          await router.push("/admin/index")
         } else {
           let message = data.message
           showMessage(message, "error")
