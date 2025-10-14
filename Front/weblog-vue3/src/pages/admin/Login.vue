@@ -41,14 +41,14 @@ async function onsubmit() {
     if (valid) {
       loading.value = true
       try {
-        const { data } = await login(loginForm.username, loginForm.password)
-        if (data.success) {
+        const res = await login(loginForm.username, loginForm.password)
+        if (res.success) {
           showMessage("登录成功")
-          let token = data.data.token
+          let token = res.data.token
           setToken(token)
           await router.push("/admin/index")
         } else {
-          let message = data.message
+          let message = res.message
           showMessage(message, "error")
         }
       } catch(e) {

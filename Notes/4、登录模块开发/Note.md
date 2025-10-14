@@ -2345,7 +2345,7 @@ async function onsubmit() {
 </template>
 ```
 
-## 10、存储 Token 到 Cookie 中
+## 十、存储 Token 到 Cookie 中
 
 ### 10.1、安装 依赖
 
@@ -2420,3 +2420,83 @@ async function onsubmit() {
 登录后可以看到已存储的`Token`：
 
 ![](images/12.png)
+
+## 十一、Axios 拦截器配置
+
+### 11.1、请求拦截器
+
+**给请求头添加`Token`**
+
+修改`axios.js`文件，添加请求拦截器：
+
+```js
+// 添加请求拦截器
+instance.interceptors.request.use(config => {
+  const token = getToken()
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+}, error => {
+  return Promise.reject(error)
+})
+```
+
+### 11.2、添加响应拦截器
+
+**优化取参不方便的问题**
+
+修改`axios.js`文件，添加响应拦截器：
+
+```js
+// 添加响应拦截器
+instance.interceptors.response.use(response => {
+  return response.data
+}, error => {
+  return Promise.reject(error)
+})
+```
+
+修改完成后，还要修改`login.vue`中接收响应参数的代码：
+
+```js
+async function onsubmit() {
+  loginFormRef.value.validate(async valid => {
+    if (valid) {
+      loading.value = true
+      try {
+        const res = await login(loginForm.username, loginForm.password)
+        if (res.success) {
+          showMessage("登录成功")
+          let token = res.data.token
+          setToken(token)
+          await router.push("/admin/index")
+        } else {
+          let message = res.message
+          showMessage(message, "error")
+        }
+      } catch(e) {
+        console.log(e)
+        showMessage("登录失败", "error")
+      } finally {
+        loading.value = false
+      }
+    }
+  })
+}
+```
+
+**统一处理请求失败问题**
+
+修改响应拦截器配置：
+
+```js
+instance.interceptors.response.use(response => {
+  return response.data
+}, error => {
+  let errorMessage = error.response.data.message || "请求失败"
+  showMessage(errorMessage, "error")
+  return Promise.reject(error)
+})
+```
+
