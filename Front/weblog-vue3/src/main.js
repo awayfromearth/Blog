@@ -6,6 +6,8 @@ import App from './App.vue'
 
 import "animate.css"
 import "@/assets/styles/main.css"
+import "@/router/permission"
+import "nprogress/nprogress.css"
 
 const app = createApp(App)
 

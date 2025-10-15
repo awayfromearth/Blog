@@ -2500,3 +2500,109 @@ instance.interceptors.response.use(response => {
 })
 ```
 
+## 十二、全局路由拦截
+
+### 12.1、前置路由守卫判断登录状态
+
+在`router`目录下新建`permission.js`文件，添加路由前置守卫：
+
+```js
+import router from "."
+
+import { getToken } from "@/utils/cookie"
+import { showMessage } from "@/utils/message"
+
+router.beforeEach((to, from, next) => {
+  // 若用户想访问后台（以 /admin 为前缀的路由）
+  // 未登录，则强制跳转登录页
+  let token = getToken()
+  if (!token && to.path.startsWith("/admin")) {
+    showMessage("请先登录", "warning")
+    next({ path: "/login" })
+  } else {
+    next()
+  }
+})
+```
+
+在`main.js`中引入路由守卫：
+```js
+```
+
+### 12.2、后置路由守卫更改页面标题
+
+修改`permission.js`内容，添加路由后置守卫：
+
+```js
+router.afterEach((to, from) => {
+  document.title = (to.meta.title || "") + " - Weblog"
+})
+```
+
+## 十三、引入 nprogress 实现页面顶部加载效果
+
+### 13.1、安装依赖并引入样式
+
+```cmd
+pnpm i nprogress
+```
+
+在`main.js`中引入`CSS`文件：
+
+```js
+import "nprogress/nprogress.css"
+```
+
+### 13.2、封装工具类
+
+在`utils`目录下新建`nprogress.js`文件，封装加载效果相关的代码：
+
+```js
+import nprogress from "nprogress"
+
+export function showPageLoading() {
+  nprogress.start()
+}
+
+export function hidePageLoading() {
+  nprogress.done()
+}
+```
+
+### 13.3、使用
+
+在路由前置守卫中显示加载效果：
+
+```js
+router.beforeEach((to, from, next) => {
+  showPageLoading()
+  // 若用户想访问后台（以 /admin 为前缀的路由）
+  // 未登录，则强制跳转登录页
+  let token = getToken()
+  if (!token && to.path.startsWith("/admin")) {
+    showMessage("请先登录", "warning")
+    next({ path: "/login" })
+  } else {
+    next()
+  }
+})
+```
+
+编辑`App.vue`文件，自定义加载颜色：
+
+```vue
+<style>
+#nprogress .bar {
+  background: #409eff !important;
+}
+</style>
+```
+
+在路由后置守卫中关闭加载效果：
+
+```js
+router.afterEach((to, from) => {
+  document.title = (to.meta.title || "") + " - Weblog"
+  hidePageLoading()
+})
+```
