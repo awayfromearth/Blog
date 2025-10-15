@@ -2527,6 +2527,7 @@ router.beforeEach((to, from, next) => {
 
 在`main.js`中引入路由守卫：
 ```js
+
 ```
 
 ### 12.2、后置路由守卫更改页面标题
@@ -2606,3 +2607,40 @@ router.afterEach((to, from) => {
   hidePageLoading()
 })
 ```
+
+## 十四、前端登录模块优化
+
+### 14.1、密码框切换明文图标及功能
+
+给`ElementPlus`输入密码框组件添加`show-passowrd`属性：
+
+```vue
+<template>
+	<!-- 省略 -->
+	<el-input v-model="loginForm.password" size="large" type="password" placeholder="请输入密码" :prefix-icon="Lock" clearable show-password />
+</template>
+```
+
+### 14.2、重复跳转登录页问题
+
+修改路由前置守卫代码，新增判断用户已登录却要访问登录页的情况，提示用户请勿重复登录并跳转至后台首页：
+
+```js
+router.beforeEach((to, from, next) => {
+  showPageLoading()
+  // 若用户想访问后台（以 /admin 为前缀的路由）
+  // 未登录，则强制跳转登录页
+  let token = getToken()
+  if (!token && to.path.startsWith("/admin")) {
+    showMessage("请先登录", "warning")
+    next({ path: "/login" })
+  } else if (token && to.path ==="/login") {
+    showMessage("请勿重复登录局", "warning")
+    next({ path: "/admin/index" })
+  }
+  else {
+    next()
+  }
+})
+```
+
