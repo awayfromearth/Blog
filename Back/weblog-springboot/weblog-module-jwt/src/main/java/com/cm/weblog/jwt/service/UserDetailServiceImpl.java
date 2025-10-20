@@ -1,15 +1,22 @@
 package com.cm.weblog.jwt.service;
 
 import com.cm.weblog.common.domain.dos.UserDO;
+import com.cm.weblog.common.domain.dos.UserRoleDO;
 import com.cm.weblog.common.domain.mapper.UserMapper;
+import com.cm.weblog.common.domain.mapper.UserRoleMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * 用户详情服务实现类
@@ -18,6 +25,8 @@ import java.util.Objects;
 public class UserDetailServiceImpl implements UserDetailsService {
     @Resource
     private UserMapper userMapper;
+    @Resource
+    private UserRoleMapper userRoleMapper;
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
@@ -34,9 +43,24 @@ public class UserDetailServiceImpl implements UserDetailsService {
             throw new UsernameNotFoundException("该用户不存在");
         }
 
-        return User.withUsername(userDO.getUsername())
+        /*return User.withUsername(userDO.getUsername())
                 .password(userDO.getPassword())
                 .authorities("ADMIN") // 暂时先写死为 ADMIN
+                .build();*/
+
+        /*
+        * 查询用户角色
+        * */
+        List<UserRoleDO> roleDOS = userRoleMapper.selectByUsername(username);
+        String[] roleArr = new String[0];
+
+        if (!CollectionUtils.isEmpty(roleDOS)) {
+            roleArr = roleDOS.stream().map(UserRoleDO::getRole).toArray(String[]::new);
+        }
+
+        return User.withUsername(userDO.getUsername())
+                .password(userDO.getPassword())
+                .authorities(roleArr)
                 .build();
     }
 }

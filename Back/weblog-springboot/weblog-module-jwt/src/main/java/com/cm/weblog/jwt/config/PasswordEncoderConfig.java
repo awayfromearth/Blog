@@ -17,6 +17,6 @@ public class PasswordEncoderConfig {
 
     public static void main(String[] args) {
         BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
-        System.out.println(bCryptPasswordEncoder.encode("admin123456"));
+        System.out.println(bCryptPasswordEncoder.encode("123456"));
     }
 }

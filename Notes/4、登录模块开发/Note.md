@@ -2644,3 +2644,300 @@ router.beforeEach((to, from, next) => {
 })
 ```
 
+## 十五、创建仅支持查询操作的演示账号
+
+### 15.1、创建角色表
+
+执行以下`ddl`语句：
+
+```sql
+CREATE TABLE `t_user_role` (
+	`id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'id',
+	`username` VARCHAR(60) NOT NULL COMMENT '用户名',
+	`role` VARCHAR(60) NOT NULL COMMENT '角色',
+	`create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+	PRIMARY KEY (`id`) USING BTREE,
+	KEY `idx_username` (`username`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 ROW_FORMAT=DYNAMIC COMMENT='用户角色表';
+```
+
+> 该表以`username`字段关联`t_user`，与用户表为多对多的关系，即一个用户可能有多个角色，一个角色可能被多位用户持有
+
+### 15.2、新增 test 用户以及角色
+
+在用户表中新增一个`test`用户，该用户仅支持查询操作，密码为123456：
+
+```sql
+INSERT INTO `weblog`.`t_user` (`username`, `password`, `create_time`, `update_time`, `is_deleted`) VALUES('test', '$2a$10$8hGbnjKfLFL2JsvC9.Q1FOO3WhGQGM/7nHFH8PTiuCfyMPhwR0YD2', now(), now(), 0);
+```
+
+> 密码的密文运行`PasswordEncoderConfig`类中的`main`方法可以得到
+
+**新增角色对应记录**
+
+在角色表中插入两个角色：`admin`账号对应管理员；`test`账号对应游客：
+
+```sql
+INSERT INTO `weblog`.`t_user_role` (`id`, `username`, `role`, `create_time`) VALUES(1, 'admin', 'ROLE_ADMIN', now());
+INSERT INTO `weblog`.`t_user_role` (`id`, `username`, `role`, `create_time`) VALUES(2, 'test', 'ROLE_VISITOR', now());
+```
+
+### 15.3、查询角色
+
+**创建`DO`类以及`Mapper`接口**
+
+在`weblog-module-common`模块下的`/domain/dos`包中，创建对应的`UserRoleDO`类：
+
+```java
+package com.cm.weblog.common.domain.dos;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Builder;
+import lombok.Data;
+
+import java.util.Date;
+
+/**
+ * 用户角色实体类
+ */
+@Data
+@Builder
+@TableName("t_user_role")
+public class UserRoleDO {
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    
+    private String username;
+    
+    private String role;
+    
+    private Date createTime;
+}
+
+```
+
+在`mapper`包下，创建`UserRoleMapper`接口：
+
+```java
+package com.cm.weblog.common.domain.mapper;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.cm.weblog.common.domain.dos.UserRoleDO;
+
+import java.util.List;
+
+public interface UserRoleMapper extends BaseMapper<UserRoleDO> {
+    /**
+     * 根据用户名查询角色
+     * @param username 用户名
+     * @return 角色列表
+     */
+    default List<UserRoleDO> selectByUsername(String username) {
+        LambdaQueryWrapper<UserRoleDO> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(UserRoleDO::getUsername, username);
+
+        return selectList(queryWrapper);
+    }
+}
+
+```
+
+**添加查询角色的逻辑**
+
+修改`UserDetailServiceImpl`类中的代码，添加通过用户名查询角色的逻辑：
+
+```java
+package com.cm.weblog.jwt.service;
+
+import com.cm.weblog.common.domain.dos.UserDO;
+import com.cm.weblog.common.domain.dos.UserRoleDO;
+import com.cm.weblog.common.domain.mapper.UserMapper;
+import com.cm.weblog.common.domain.mapper.UserRoleMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
+
+import javax.annotation.Resource;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+/**
+ * 用户详情服务实现类
+ */
+@Service
+public class UserDetailServiceImpl implements UserDetailsService {
+    @Resource
+    private UserMapper userMapper;
+    @Resource
+    private UserRoleMapper userRoleMapper;
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        // 暂时先写死
+        /*return User.withUsername("admin")
+                .password("$2a$10$nL1x8aqM.Lfm..AYXiFVFeBBUU.Vjinc9NCSqoRrnw7E.F9s10Mxe")
+                .authorities("ADMIN")
+                .build();*/
+
+        // 改为从数据库中查询
+        UserDO userDO = userMapper.findByUsername(username);
+
+        if (Objects.isNull(userDO)) {
+            throw new UsernameNotFoundException("该用户不存在");
+        }
+
+        /*return User.withUsername(userDO.getUsername())
+                .password(userDO.getPassword())
+                .authorities("ADMIN") // 暂时先写死为 ADMIN
+                .build();*/
+        
+        /*
+        * 查询用户角色
+        * */
+        List<UserRoleDO> roleDOS = userRoleMapper.selectByUsername(username);
+        String[] roleArr = new String[0];
+        
+        if (!CollectionUtils.isEmpty(roleDOS)) {
+            roleArr = roleDOS.stream().map(UserRoleDO::getRole).toArray(String[]::new);
+        }
+        
+        return User.withUsername(userDO.getUsername())
+                .password(userDO.getPassword())
+                .authorities(roleArr)
+                .build();
+    }
+}
+
+```
+
+### 15.4、改善权限不足的响应参数
+
+**新增枚举值**
+
+在`ResponseCodeEnum`中新增权限不够的枚举：
+
+```java
+FORBIDDEN("20004", "演示账号仅支持查询操作！")
+```
+
+**修改处理失败的自定义处理器**
+
+修改`RestAccessDeniedHandler`的代码，增加权限不够的提示：
+
+```java
+package com.cm.weblog.jwt.handler;
+
+import com.cm.weblog.common.enums.ResponseCodeEnum;
+import com.cm.weblog.common.utils.Response;
+import com.cm.weblog.jwt.utils.ResultUtil;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.stereotype.Component;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+/**
+ * 用户权限不足处理器
+ */
+@Slf4j
+@Component
+public class RestAccessDeniedHandler implements AccessDeniedHandler {
+    @Override
+    public void handle(HttpServletRequest request, HttpServletResponse response, AccessDeniedException accessDeniedException) throws IOException, ServletException {
+        log.warn("该用户暂无权限：", accessDeniedException);
+
+        ResultUtil.fail(response, Response.fail(ResponseCodeEnum.FORBIDDEN));
+    }
+}
+
+```
+
+### 15.5、启用 Spring Security 方法级注解
+
+在`weblog-module-common`模块中的`pom.xml`中添加依赖：
+
+```xml
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-security</artifactId>
+</dependency>
+```
+
+编辑`WebSecurityConfig`配置类，添加`@EnableGlobalMethodSecurity`注解：
+
+```java
+/**
+ * Spring Security 配置类
+ */
+@Configuration
+@EnableWebSecurity
+@EnableGlobalMethodSecurity(prePostEnabled = true, securedEnabled = true)
+public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
+    // ... 省略
+}
+```
+
+### 15.6、全局捕获异常
+
+在全局异常捕获类`GlobalExceptionHandler`中添加方法手动抛出异常`AccessDeniedException`：
+
+```java
+@ExceptionHandler({ AcceptPendingException.class })
+public void throwAccessDeniedException(AccessDeniedException e) throws AccessDeniedException {
+	log.info("============= 捕获到 AccessDeniedException ============");
+	throw e;
+}
+```
+
+### 15.7、添加鉴权注解
+
+在`TestController`控制器中添加一个`/admin/update`的`GET`接口，并添加注解以在调用之前先鉴权，必须是拥有管理员角色的账号发来的请求才允许正常执行：
+
+```java
+@GetMapping("/admin/update")
+@ApiOperationLog(description = "测试更新接口")
+@ApiOperation(value = "测试更新接口")
+@PreAuthorize("hasRole('ROLE_ADMIN')")
+public Response<?> testUpdate() {
+	log.info("更新成功...");
+	return Response.success();
+}
+```
+
+### 15.8、测试
+
+用管理员账号发送请求，响应如下：
+
+```json
+{
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": null
+}
+```
+
+用游客账号发送请求，响应如下：
+
+```json
+{
+    "success": false,
+    "message": "演示账号仅支持查询操作！",
+    "code": "20004",
+    "data": null
+}
+```
+
