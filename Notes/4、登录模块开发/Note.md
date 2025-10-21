@@ -2895,7 +2895,7 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 在全局异常捕获类`GlobalExceptionHandler`中添加方法手动抛出异常`AccessDeniedException`：
 
 ```java
-@ExceptionHandler({ AcceptPendingException.class })
+@ExceptionHandler({ AccessDeniedException.class })
 public void throwAccessDeniedException(AccessDeniedException e) throws AccessDeniedException {
 	log.info("============= 捕获到 AccessDeniedException ============");
 	throw e;
