@@ -2902,6 +2902,8 @@ public void throwAccessDeniedException(AccessDeniedException e) throws AccessDen
 }
 ```
 
+> 注意`AccessDeniedException`的包引入路径：`import org.springframework.security.access.AccessDeniedException;`
+
 ### 15.7、添加鉴权注解
 
 在`TestController`控制器中添加一个`/admin/update`的`GET`接口，并添加注解以在调用之前先鉴权，必须是拥有管理员角色的账号发来的请求才允许正常执行：
