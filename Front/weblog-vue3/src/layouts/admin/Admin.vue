@@ -3,6 +3,9 @@ import AdminHeader from "@/layouts/admin/components/AdminHeader.vue"
 import AdminMenu from "@/layouts/admin/components/AdminMenu.vue"
 import AdminTagsList from "@/layouts/admin/components/AdminTagsList.vue"
 import AdminFooter from "@/layouts/admin/components/AdminFooter.vue"
+
+import { useMenuStore } from "@/stores/menu"
+const menuStore = useMenuStore()
 </script>
 
 <template>
@@ -10,7 +13,7 @@ import AdminFooter from "@/layouts/admin/components/AdminFooter.vue"
   <el-container>
 
     <!-- 左边侧边栏 -->
-    <el-aside>
+    <el-aside class="transition-all" :width="menuStore.isMenuCollapsed ? '64px' : '250px'">
       <AdminMenu />
     </el-aside>
 
@@ -37,5 +40,7 @@ import AdminFooter from "@/layouts/admin/components/AdminFooter.vue"
 </template>
 
 <style scoped>
-
+.el-header {
+  padding: 0 !important;
+}
 </style>
