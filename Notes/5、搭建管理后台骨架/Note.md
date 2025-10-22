@@ -515,11 +515,10 @@ const isCollapsed = computed(() => menuStore.isCollapsed)
   border-right: 0;
 }
 .el-menu-item.is-active {
-  background-color: var(--el-color-primary);
-  color: #fff;
+  color: var(--el-color-primary);
 }
 .el-menu-item.is-active:hover {
-  background-color: var(--el-color-primary);
+  background-color: rgb(30 41 59 / 1);
 }
 .el-menu-item {
   color: #fff;
@@ -632,11 +631,10 @@ const isCollapsed = computed(() => menuStore.isMenuCollapsed)
   border-right: 0;
 }
 .el-menu-item.is-active {
-  background-color: var(--el-color-primary);
-  color: #fff;
+  color: var(--el-color-primary);
 }
 .el-menu-item.is-active:hover {
-  background-color: var(--el-color-primary);
+  background-color: rgb(30 41 59 / 1);
 }
 .el-menu-item {
   color: #fff;
@@ -791,3 +789,123 @@ export const MENUS = [
 
 ### 5.2、默认选中当前路由对应项
 
+为`el-menu`组件添加`default-active`属性，指定默认高亮的菜单项：
+
+```vue
+<script setup>
+// ...省略
+import {useRoute, useRouter} from "vue-router"
+
+const route = useRoute()
+</script>
+
+<!-- 下方菜单 -->
+<el-menu
+	class="el-menu-vertical-demo"
+	:collapse="isCollapsed"
+	:collapse-transition="false"
+	:default-active="route.path"
+>
+    <!-- 省略 -->
+</el-menu>
+```
+
+### 5.3、跳转路由
+
+点击每项菜单后分别跳转到对应的页面：
+
+```vue
+<!-- 下方菜单 -->
+<el-menu
+	class="el-menu-vertical-demo"
+	:collapse="isCollapsed"
+	:collapse-transition="false"
+	:default-active="route.path"
+	@select="p => router.push(p)"
+>
+    <!-- 省略 -->
+</el-menu>
+```
+
+测试前先在`pages/admin`目录下分别建好每个路由对应的页面：
+
+文章管理页`ArticleList.vue`：
+
+```vue
+<template>
+  文章管理页
+</template>
+```
+
+类别管理页`CategoryList.vue`：
+
+```vue
+<template>
+  类别管理页
+</template>
+```
+
+标签管理页`TagList.vue`：
+
+```vue
+<template>
+  标签管理页
+</template>
+```
+
+博客设置页`BlogSetting.vue`：
+
+```vue
+<template>
+  博客设置页
+</template>
+```
+
+创建好后在`router/route.js`中注册路由：
+
+```js
+// ...省略
+{
+	path: "/admin",
+	component: Admin,
+	children: [
+		{
+			path: "/admin/index",
+			component: AdminIndex,
+			meta: {
+				title: "仪表盘"
+			}
+		},
+		{
+			path: "/admin/article/list",
+			component: () => import("@/pages/admin/ArticleList.vue"),
+			meta: {
+				title: "文章管理"
+			}
+		},
+		{
+			path: "/admin/category/list",
+			component: () => import("@/pages/admin/CategoryList.vue"),
+			meta: {
+ 				title: "类别管理"
+			}
+		},
+		{
+			path: "/admin/tag/list",
+			component: () => import("@/pages/admin/TagList.vue"),
+			meta: {
+				title: "标签管理"
+			}
+		},
+		{
+			path: "/admin/blog/setting",
+			component: () => import("@/pages/admin/BlogSetting.vue"),
+			meta: {
+				title: "博客设置"
+			}
+		}
+	]
+}
+```
+
+点击菜单项查看效果

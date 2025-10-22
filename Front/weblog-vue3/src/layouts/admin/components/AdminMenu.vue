@@ -2,6 +2,10 @@
 import { useMenuStore } from "@/stores/menu"
 import { computed } from "vue"
 import { MENUS } from "@/constants/menus"
+import {useRoute, useRouter} from "vue-router"
+
+const route = useRoute()
+const router = useRouter()
 
 const menuStore = useMenuStore()
 
@@ -18,10 +22,11 @@ const isCollapsed = computed(() => menuStore.isMenuCollapsed)
 
     <!-- 下方菜单 -->
     <el-menu
-        default-active="2"
         class="el-menu-vertical-demo"
         :collapse="isCollapsed"
         :collapse-transition="false"
+        :default-active="route.path"
+        @select="p => router.push(p)"
     >
       <el-menu-item v-for="(item, index) in MENUS" :key="index" :index="item.path">
         <el-icon>
@@ -39,11 +44,10 @@ const isCollapsed = computed(() => menuStore.isMenuCollapsed)
   border-right: 0;
 }
 .el-menu-item.is-active {
-  background-color: var(--el-color-primary);
-  color: #fff;
+  color: var(--el-color-primary);
 }
 .el-menu-item.is-active:hover {
-  background-color: var(--el-color-primary);
+  background-color: rgb(30 41 59 / 1);
 }
 .el-menu-item {
   color: #fff;

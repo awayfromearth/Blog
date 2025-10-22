@@ -23,10 +23,38 @@ const routes = [
         component: Admin,
         children: [
             {
-                path: "/admin/index", // 后台首页
+                path: "/admin/index",
                 component: AdminIndex,
                 meta: {
-                    title: "Admin 后台首页"
+                    title: "仪表盘"
+                }
+            },
+            {
+                path: "/admin/article/list",
+                component: () => import("@/pages/admin/ArticleList.vue"),
+                meta: {
+                    title: "文章管理"
+                }
+            },
+            {
+                path: "/admin/category/list",
+                component: () => import("@/pages/admin/CategoryList.vue"),
+                meta: {
+                    title: "类别管理"
+                }
+            },
+            {
+                path: "/admin/tag/list",
+                component: () => import("@/pages/admin/TagList.vue"),
+                meta: {
+                    title: "标签管理"
+                }
+            },
+            {
+                path: "/admin/blog/setting",
+                component: () => import("@/pages/admin/BlogSetting.vue"),
+                meta: {
+                    title: "博客设置"
                 }
             }
         ]
