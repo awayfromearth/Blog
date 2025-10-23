@@ -1,23 +1,112 @@
 <script setup>
 import { useMenuStore } from "@/stores/menu"
-import { MENUS } from "@/constants/menus"
+import { ref } from "vue"
+import { useRoute, onBeforeRouteUpdate, useRouter } from "vue-router"
+import { getTabList, setTabList } from "@/utils/cookie.js"
 
 const menuStore = useMenuStore()
+
+const route = useRoute()
+const router = useRouter()
+
+const activeTab = ref(route.path)
+
+const tabList = ref([
+  {
+    name: "仪表盘",
+    path: "/admin/index"
+  }
+])
+
+function addTab(tab) {
+  let isTabExisted = tabList.value.find(item => item.path === tab.path)
+  if (!isTabExisted) {
+    tabList.value.push(tab)
+  }
+  setTabList(tabList.value)
+}
+
+onBeforeRouteUpdate((to, from) => {
+  activeTab.value = to.path
+  addTab({
+    name: to.meta.title,
+    path: to.path
+  })
+})
+
+function handleTabChange(path) {
+  activeTab.value = path
+  router.push(path)
+}
+
+function initTabList() {
+  let tabs = getTabList()
+  if (tabs) {
+    tabList.value = tabs
+  }
+}
+
+initTabList()
+
+function handleTabRemove(path) {
+  let tabs = tabList.value
+  let actTab = activeTab.value
+
+  let tab
+
+  if (actTab === path) {
+    for (let i = 0; i < tabs.length; i++) {
+      tab = tabs[i]
+      if (tab.path === path) {
+        let nextTab = tabs[i + 1] || tabs[i - 1]
+        if(nextTab) {
+          actTab = nextTab.path
+        }
+      }
+    }
+  }
+
+  activeTab.value = actTab
+
+  tabList.value = tabList.value.filter(t => t.path !== path)
+
+  setTabList(tabList.value)
+
+  handleTabChange(activeTab.value)
+}
+
+function handleCloseTab(command) {
+  let indexPath = "/admin/index"
+  if (command === "others") {
+    tabList.value = tabList.value.filter(t => t.path === indexPath || t.path === activeTab.value)
+  }
+
+  if (command === "all") {
+    activeTab.value = indexPath
+    tabList.value = tabList.value.filter(t => t.path === indexPath)
+    handleTabChange(activeTab.value)
+  }
+
+  setTabList(tabList.value)
+}
 </script>
 
 <template>
   <div class="fixed top-[64px] h-[44px] px-2 right-0 z-50 flex items-center bg-white transition-all" :style="{ left: menuStore.isMenuCollapsed ? '64px' : '250px' }">
     <!-- 左侧：标签导航 -->
-    <el-tabs type="card" closable style="min-width: 10px;">
-      <el-tab-pane  key="1" label="Tab 1" name="1">
-      </el-tab-pane>
-      <el-tab-pane key="2" label="Tab 2" name="2">
-      </el-tab-pane>
+    <el-tabs v-model="activeTab" @tab-change="handleTabChange" @tab-remove="handleTabRemove" type="card" closable style="min-width: 10px;">
+      <el-tab-pane
+        v-for="(m, i) in tabList"
+        :key="m.path"
+        :label="m.name"
+        :name="m.path"
+        :closable="i > 0"
+      />
     </el-tabs>
 
     <!-- 右侧：下拉菜单 -->
     <span class="ml-auto flex items-center justify-center h-[32px] w-[32px]">
-      <el-dropdown>
+      <el-dropdown @command="handleCloseTab">
         <span class="el-dropdown-link">
           <el-icon class="el-icon--right">
             <arrow-down />
@@ -25,8 +114,8 @@ const menuStore = useMenuStore()
         </span>
         <template #dropdown>
           <el-dropdown-menu>
-            <el-dropdown-item>关闭其他</el-dropdown-item>
-            <el-dropdown-item>关闭全部</el-dropdown-item>
+            <el-dropdown-item command="others">关闭其他</el-dropdown-item>
+            <el-dropdown-item command="all">关闭全部</el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>

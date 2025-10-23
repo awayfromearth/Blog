@@ -1070,10 +1070,678 @@ const menuStore = useMenuStore()
 
 ### 6.2、功能实现
 
-#### 6.2.1、路由同步
+#### 6.2.1、标签项与路由一致
 
-修改`AdminTagList.vue`中的`tabs`组件，有真实路由循环生成：
+修改`AdminTagList.vue`中的`tabs`组件，由真实路由循环生成：
 
 ```vue
+<script setup>
+import { MENUS } from "@/constants/menus"
+</script>
+ <!-- 左侧：标签导航 -->
+<el-tabs type="card" closable style="min-width: 10px;">
+  <el-tab-pane
+	v-for="(m, i) in MENUS"
+	:key="m.path"
+	:label="m.name"
+	:name="m.path"
+  />
+</el-tabs>
+```
+
+根据当前路由切换选中路由
+
+继续编辑`AdminTagList.vue`，给`tabs`组件绑定`activeTab`变量：
+
+```vue
+<script setup>
+import { ref } from "vue"
+import { useRoute } from "vue-router"
+    
+const route = useRoute()
+
+const activeTab = ref(route.path)
+</script>
+
+<el-tabs v-model="activeTab" type="card" closable style="min-width: 10px;">
+	<!--省略-->
+</el-tabs>
+```
+
+添加`closable`属性设置首页标签栏无法关闭：
+
+```vue
+<el-tab-pane
+   v-for="(m, i) in MENUS"
+   :key="m.path"
+   :label="m.name"
+   :name="m.path"
+   :closable="i > 0"
+/>
+```
+
+#### 6.2.2、动态添加标签
+
+修改循环的数组，初始状态仅保留仪表盘页：
+
+```vue
+<script setup>
+import { useMenuStore } from "@/stores/menu"
+import { ref } from "vue"
+import { useRoute } from "vue-router"
+
+const menuStore = useMenuStore()
+
+const route = useRoute()
+
+const activeTab = ref(route.path)
+
+const tabList = ref([
+  {
+    name: "仪表盘",
+    path: "/admin/index"
+  }
+])
+</script>
+
+<template>
+  <div class="fixed top-[64px] h-[44px] px-2 right-0 z-50 flex items-center bg-white transition-all" :style="{ left: menuStore.isMenuCollapsed ? '64px' : '250px' }">
+    <!-- 左侧：标签导航 -->
+    <el-tabs v-model="activeTab" type="card" closable style="min-width: 10px;">
+      <el-tab-pane
+        v-for="(m, i) in tabList"
+        :key="m.path"
+        :label="m.name"
+        :name="m.path"
+        :closable="i > 0"
+      />
+    </el-tabs>
+
+    <!-- 右侧：下拉菜单 -->
+    <span class="ml-auto flex items-center justify-center h-[32px] w-[32px]">
+      <el-dropdown>
+        <span class="el-dropdown-link">
+          <el-icon class="el-icon--right">
+            <arrow-down />
+          </el-icon>
+        </span>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item>关闭其他</el-dropdown-item>
+            <el-dropdown-item>关闭全部</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </span>
+  </div>
+  <div class="h-[44px]"></div>
+</template>
+
+<style scoped>
+:deep(.el-tabs__item) {
+  font-size: 12px;
+  border: 1px solid #d8dce5!important;
+  border-radius: 3px!important;
+}
+
+:deep(.el-tabs--card>.el-tabs__header .el-tabs__item) {
+  margin-left: 0.1rem!important;
+  margin-right: 0.1rem!important;
+}
+
+:deep(.el-tabs__item.is-active) {
+  background-color: var(--el-color-primary) !important;
+  color: #fff;
+}
+
+:deep(.el-tabs__item.is-active::before) {
+  content: "";
+  background-color: #fff;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  position: relative;
+  margin-right: 4px;
+}
+
+:deep(.el-tabs) {
+  height: 32px;
+}
+
+:deep(.el-tabs__header) {
+  margin-bottom: 0;
+}
+
+:deep(.el-tabs--card>.el-tabs__header .el-tabs__nav) {
+  border: 0;
+}
+
+:deep(.el-tabs--card>.el-tabs__header .el-tabs__item) {
+  height: 32px;
+  line-height: 32px;
+  border: 0;
+  background: #fff;
+}
+
+:deep(.el-tabs--card>.el-tabs__header) {
+  border: 0;
+}
+
+:deep(.el-tabs__nav-prev, .el-tabs__nav-next) {
+  line-height: 35px;
+}
+
+:deep(.is-disabled) {
+  cursor: not-allowed;
+  color: #d1d5db;
+}
+</style>
+```
+
+在`vue-router`的`onBeforeRouteUpdate`生命周期钩子中添加标签：
+
+```vue
+<script setup>
+import { useMenuStore } from "@/stores/menu"
+import { ref } from "vue"
+import { useRoute, onBeforeRouteUpdate, } from "vue-router"
+
+const menuStore = useMenuStore()
+
+const route = useRoute()
+
+const activeTab = ref(route.path)
+
+const tabList = ref([
+  {
+    name: "仪表盘",
+    path: "/admin/index"
+  }
+])
+
+function addTab(tab) {
+  let isTabExisted = tabList.value.find(item => item.path === tab.path)
+  if (!isTabExisted) {
+    tabList.value.push(tab)
+  }
+}
+
+onBeforeRouteUpdate((to, from) => {
+  activeTab.value = to.path
+  addTab({
+    name: to.meta.title,
+    path: to.path
+  })
+})
+</script>
+
+<template>
+  <div class="fixed top-[64px] h-[44px] px-2 right-0 z-50 flex items-center bg-white transition-all" :style="{ left: menuStore.isMenuCollapsed ? '64px' : '250px' }">
+    <!-- 左侧：标签导航 -->
+    <el-tabs v-model="activeTab" type="card" closable style="min-width: 10px;">
+      <el-tab-pane
+        v-for="(m, i) in tabList"
+        :key="m.path"
+        :label="m.name"
+        :name="m.path"
+        :closable="i > 0"
+      />
+    </el-tabs>
+
+    <!-- 右侧：下拉菜单 -->
+    <span class="ml-auto flex items-center justify-center h-[32px] w-[32px]">
+      <el-dropdown>
+        <span class="el-dropdown-link">
+          <el-icon class="el-icon--right">
+            <arrow-down />
+          </el-icon>
+        </span>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item>关闭其他</el-dropdown-item>
+            <el-dropdown-item>关闭全部</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </span>
+  </div>
+  <div class="h-[44px]"></div>
+</template>
+
+<style scoped>
+:deep(.el-tabs__item) {
+  font-size: 12px;
+  border: 1px solid #d8dce5!important;
+  border-radius: 3px!important;
+}
+
+:deep(.el-tabs--card>.el-tabs__header .el-tabs__item) {
+  margin-left: 0.1rem!important;
+  margin-right: 0.1rem!important;
+}
+
+:deep(.el-tabs__item.is-active) {
+  background-color: var(--el-color-primary) !important;
+  color: #fff;
+}
+
+:deep(.el-tabs__item.is-active::before) {
+  content: "";
+  background-color: #fff;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  position: relative;
+  margin-right: 4px;
+}
+
+:deep(.el-tabs) {
+  height: 32px;
+}
+
+:deep(.el-tabs__header) {
+  margin-bottom: 0;
+}
+
+:deep(.el-tabs--card>.el-tabs__header .el-tabs__nav) {
+  border: 0;
+}
+
+:deep(.el-tabs--card>.el-tabs__header .el-tabs__item) {
+  height: 32px;
+  line-height: 32px;
+  border: 0;
+  background: #fff;
+}
+
+:deep(.el-tabs--card>.el-tabs__header) {
+  border: 0;
+}
+
+:deep(.el-tabs__nav-prev, .el-tabs__nav-next) {
+  line-height: 35px;
+}
+
+:deep(.is-disabled) {
+  cursor: not-allowed;
+  color: #d1d5db;
+}
+</style>
+```
+
+点击标签跳转路由：
+
+```vue
+<script setup>
+import { useMenuStore } from "@/stores/menu"
+import { ref } from "vue"
+import { useRoute, onBeforeRouteUpdate, useRouter } from "vue-router"
+
+const menuStore = useMenuStore()
+
+const route = useRoute()
+const router = useRouter()
+
+const activeTab = ref(route.path)
+
+const tabList = ref([
+  {
+    name: "仪表盘",
+    path: "/admin/index"
+  }
+])
+
+function addTab(tab) {
+  let isTabExisted = tabList.value.find(item => item.path === tab.path)
+  if (!isTabExisted) {
+    tabList.value.push(tab)
+  }
+}
+
+onBeforeRouteUpdate((to, from) => {
+  activeTab.value = to.path
+  addTab({
+    name: to.meta.title,
+    path: to.path
+  })
+})
+
+function handleTabChange(path) {
+  activeTab.value = path
+  router.push(path)
+}
+</script>
+
+<template>
+  <div class="fixed top-[64px] h-[44px] px-2 right-0 z-50 flex items-center bg-white transition-all" :style="{ left: menuStore.isMenuCollapsed ? '64px' : '250px' }">
+    <!-- 左侧：标签导航 -->
+    <el-tabs v-model="activeTab" @tab-change="handleTabChange" type="card" closable style="min-width: 10px;">
+      <el-tab-pane
+        v-for="(m, i) in tabList"
+        :key="m.path"
+        :label="m.name"
+        :name="m.path"
+        :closable="i > 0"
+      />
+    </el-tabs>
+
+    <!-- 右侧：下拉菜单 -->
+    <span class="ml-auto flex items-center justify-center h-[32px] w-[32px]">
+      <el-dropdown>
+        <span class="el-dropdown-link">
+          <el-icon class="el-icon--right">
+            <arrow-down />
+          </el-icon>
+        </span>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item>关闭其他</el-dropdown-item>
+            <el-dropdown-item>关闭全部</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </span>
+  </div>
+  <div class="h-[44px]"></div>
+</template>
+
+<style scoped>
+:deep(.el-tabs__item) {
+  font-size: 12px;
+  border: 1px solid #d8dce5!important;
+  border-radius: 3px!important;
+}
+
+:deep(.el-tabs--card>.el-tabs__header .el-tabs__item) {
+  margin-left: 0.1rem!important;
+  margin-right: 0.1rem!important;
+}
+
+:deep(.el-tabs__item.is-active) {
+  background-color: var(--el-color-primary) !important;
+  color: #fff;
+}
+
+:deep(.el-tabs__item.is-active::before) {
+  content: "";
+  background-color: #fff;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  position: relative;
+  margin-right: 4px;
+}
+
+:deep(.el-tabs) {
+  height: 32px;
+}
+
+:deep(.el-tabs__header) {
+  margin-bottom: 0;
+}
+
+:deep(.el-tabs--card>.el-tabs__header .el-tabs__nav) {
+  border: 0;
+}
+
+:deep(.el-tabs--card>.el-tabs__header .el-tabs__item) {
+  height: 32px;
+  line-height: 32px;
+  border: 0;
+  background: #fff;
+}
+
+:deep(.el-tabs--card>.el-tabs__header) {
+  border: 0;
+}
+
+:deep(.el-tabs__nav-prev, .el-tabs__nav-next) {
+  line-height: 35px;
+}
+
+:deep(.is-disabled) {
+  cursor: not-allowed;
+  color: #d1d5db;
+}
+</style>
+```
+
+#### 6.2.3、标签持久化
+
+在`utils`目录下的`cookie.js`中新增标签相关的方法，将标签项存储到`cookie`中并在需要的地方取用：
+
+```js
+import { useCookies } from "@vueuse/integrations/useCookies"
+
+const TOKEN_KEY = "Authorization"
+const TAB_LIST_LEY = "tabList"
+
+const cookie = useCookies()
+
+export function getToken() {
+    return cookie.get(TOKEN_KEY)
+}
+
+export function setToken(token) {
+    return cookie.set(TOKEN_KEY, token)
+}
+
+export function removeToken() {
+    return cookie.remove(TOKEN_KEY)
+}
+
+export function getTabList() {
+    return cookie.get(TAB_LIST_LEY)
+}
+
+export function setTabList(tabList) {
+    return cookie.set(TAB_LIST_LEY, tabList)
+}
+```
+
+在`AdminTagList.vue`中访问与设置：
+
+```vue
+<script setup>
+import { useMenuStore } from "@/stores/menu"
+import { ref } from "vue"
+import { useRoute, onBeforeRouteUpdate, useRouter } from "vue-router"
+import { getTabList, setTabList } from "@/utils/cookie.js"
+
+const menuStore = useMenuStore()
+
+const route = useRoute()
+const router = useRouter()
+
+const activeTab = ref(route.path)
+
+const tabList = ref([
+  {
+    name: "仪表盘",
+    path: "/admin/index"
+  }
+])
+
+function addTab(tab) {
+  let isTabExisted = tabList.value.find(item => item.path === tab.path)
+  if (!isTabExisted) {
+    tabList.value.push(tab)
+  }
+  setTabList(tabList.value)
+}
+
+onBeforeRouteUpdate((to, from) => {
+  activeTab.value = to.path
+  addTab({
+    name: to.meta.title,
+    path: to.path
+  })
+})
+
+function handleTabChange(path) {
+  activeTab.value = path
+  router.push(path)
+}
+
+function initTabList() {
+  let tabs = getTabList()
+  if (tabs) {
+    tabList.value = tabs
+  }
+}
+
+initTabList()
+</script>
+
+<template>
+  <div class="fixed top-[64px] h-[44px] px-2 right-0 z-50 flex items-center bg-white transition-all" :style="{ left: menuStore.isMenuCollapsed ? '64px' : '250px' }">
+    <!-- 左侧：标签导航 -->
+    <el-tabs v-model="activeTab" @tab-change="handleTabChange" type="card" closable style="min-width: 10px;">
+      <el-tab-pane
+        v-for="(m, i) in tabList"
+        :key="m.path"
+        :label="m.name"
+        :name="m.path"
+        :closable="i > 0"
+      />
+    </el-tabs>
+
+    <!-- 右侧：下拉菜单 -->
+    <span class="ml-auto flex items-center justify-center h-[32px] w-[32px]">
+      <el-dropdown>
+        <span class="el-dropdown-link">
+          <el-icon class="el-icon--right">
+            <arrow-down />
+          </el-icon>
+        </span>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item>关闭其他</el-dropdown-item>
+            <el-dropdown-item>关闭全部</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </span>
+  </div>
+  <div class="h-[44px]"></div>
+</template>
+
+<style scoped>
+:deep(.el-tabs__item) {
+  font-size: 12px;
+  border: 1px solid #d8dce5!important;
+  border-radius: 3px!important;
+}
+
+:deep(.el-tabs--card>.el-tabs__header .el-tabs__item) {
+  margin-left: 0.1rem!important;
+  margin-right: 0.1rem!important;
+}
+
+:deep(.el-tabs__item.is-active) {
+  background-color: var(--el-color-primary) !important;
+  color: #fff;
+}
+
+:deep(.el-tabs__item.is-active::before) {
+  content: "";
+  background-color: #fff;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  position: relative;
+  margin-right: 4px;
+}
+
+:deep(.el-tabs) {
+  height: 32px;
+}
+
+:deep(.el-tabs__header) {
+  margin-bottom: 0;
+}
+
+:deep(.el-tabs--card>.el-tabs__header .el-tabs__nav) {
+  border: 0;
+}
+
+:deep(.el-tabs--card>.el-tabs__header .el-tabs__item) {
+  height: 32px;
+  line-height: 32px;
+  border: 0;
+  background: #fff;
+}
+
+:deep(.el-tabs--card>.el-tabs__header) {
+  border: 0;
+}
+
+:deep(.el-tabs__nav-prev, .el-tabs__nav-next) {
+  line-height: 35px;
+}
+
+:deep(.is-disabled) {
+  cursor: not-allowed;
+  color: #d1d5db;
+}
+</style>
+```
+
+#### 6.2.4、标签项关闭功能
+
+修改`AdminTagList.vue`文件，新增`handleTabRemove`方法绑定在`el-tab`组件的`tab-remove`事件，点击标签项关闭按钮时关闭标签以及其他操作：
+
+```js
+function handleTabRemove(path) {
+  let tabs = tabList.value
+  let actTab = activeTab.value
+  
+  let tab
+  
+  if (actTab === path) {
+    for (let i = 0; i < tabs.length; i++) {
+      tab = tabs[i]
+      if (tab.path === path) {
+        let nextTab = tabs[i + 1] || tabs[i - 1]
+        if(nextTab) {
+          actTab = nextTab.path
+        }
+      }
+    }
+  }
+  
+  activeTab.value = tab
+  
+  tabList.value = tabList.value.filter(t => t.path !== path)
+  
+  setTabList(tabList.value)
+  
+  handleTabChange(activeTab.value)
+}
+```
+
+#### 6.2.5、关闭其它、关闭全部功能
+
+先为`el-dropdown`组件子项添加`command`属性，分别为`others`和`all`，为`dropdown`组件绑定`command`事件，触发`handleCloseTab`函数，做如下处理：
+
+```js
+function handleCloseTab(command) {
+  let indexPath = "/admin/index"
+  if (command === "others") {
+    tabList.value = tabList.value.filter(t => t.path === indexPath || t.path === activeTab.value)
+  }
+  
+  if (command === "all") {
+    activeTab.value = indexPath
+    tabList.value = tabList.value.filter(t => t.path === indexPath)
+    handleTabChange(activeTab.value)
+  }
+  
+  setTabList(tabList.value)
+}
 ```
 
