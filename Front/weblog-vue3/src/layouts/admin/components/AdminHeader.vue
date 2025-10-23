@@ -15,7 +15,7 @@ function handleRefresh() {
 <template>
   <!-- 通过 flex 指定水平布局 -->
   <!-- 设置背景色为白色、高度为 64px，padding-right 为 4， border-bottom 为 slate 200 -->
-  <div class="bg-white h-[64px] flex pr-4 border-b border-slate-200">
+  <div class="bg-white h-[64px] flex pr-4 border-b border-slate-100">
     <!-- 左边栏收缩、展开 -->
     <div class="w-[42px] h-[64px] cursor-pointer flex items-center justify-center text-gray-700 hover:bg-gray-200" @click="menuStore.toggleMenuCollapsed">
       <el-icon>
@@ -45,7 +45,7 @@ function handleRefresh() {
       </el-tooltip>
 
       <!-- 登录用户头像 -->
-      <el-dropdown trigger="click">
+      <el-dropdown trigger="click" class="flex items-center justify-center">
         <span class="el-dropdown-link flex items-center justify-center text-gray-700 text-xs">
           <!-- 头像 Avatar -->
           <el-avatar class="mr-2" :size="25" :src="AvatarImg" />
