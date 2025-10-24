@@ -183,4 +183,8 @@ function handleCloseTab(command) {
   cursor: not-allowed;
   color: #d1d5db;
 }
+
+:deep(.el-dropdown-link) {
+  outline: none !important;
+}
 </style>

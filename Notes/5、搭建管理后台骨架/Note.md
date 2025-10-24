@@ -1745,3 +1745,95 @@ function handleCloseTab(command) {
 }
 ```
 
+## 七、页脚版权信息组件
+
+`AdminFooter.vue`：
+
+```vue
+<template>
+  <div class="bg-white py-5 flex items-center justify-center text-sm text-gray-500 shadow-none">
+    <!-- Copyright 版权信息 -->
+    Copyright © 2023. All rights reserved. Provided by&nbsp; <a class="underline" href="https://www.quanxiaoha.com" target="_blank">犬小哈</a>
+  </div>
+</template>
+```
+
+`Admin.vue`：
+
+```vue
+<style scoped>
+.el-header, .el-footer {
+  padding: 0 !important;
+}
+</style>
+```
+
+最终效果：
+
+![](images/2.png)
+
+## 八、组件缓存
+
+修改`Admin.vue`中的`router-view`组件，使用`keepAlive`缓存组件，提高页面切换性能和响应速度：
+
+```vue
+<!-- 主内容（根据路由动态展示不同页面） -->
+<router-view v-slot="{ Component }">
+  <KeepAlive :max="10">
+	<component :is="Component" />
+  </KeepAlive>
+</router-view>
+```
+
+## 九、全局过渡动画
+
+修改`Admin.vue`中的`router-view`组件，将内部所有内容用`Transition`组件包裹并为该组件命名为`fade`：
+
+```vue
+<!-- 主内容（根据路由动态展示不同页面） -->
+<router-view v-slot="{ Component }">
+  <Transition name="fade">
+	<KeepAlive :max="10">
+	  <component :is="Component" />
+	</KeepAlive>
+  </Transition>
+</router-view>
+```
+
+再为该组件自定义淡入淡出动画：
+
+```css
+/* 内容区域过渡动画：淡入淡出效果 */
+/* 刚开始进入时 */
+.fade-enter-from {
+    /* 透明度 */
+    opacity: 0;
+}
+
+/* 刚开始结束 */
+.fade-enter-to {
+    opacity: 1;
+}
+
+/* 刚开始离开 */
+.fade-leave-from {
+  opacity: 1;
+}
+
+/* 离开已结束 */
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* 离开进行中 */
+.fade-leave-active {
+    transition: all 0.3s;
+}
+
+/* 进入进行中 */
+.fade-enter-active {
+    transition: all 0.3s;
+    transition-delay: 0.3s;
+}
+```
+
