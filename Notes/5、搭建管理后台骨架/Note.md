@@ -1837,3 +1837,255 @@ function handleCloseTab(command) {
 }
 ```
 
+## 十、右侧用户名
+
+### 10.1、开发获取当前登录用户信息接口
+
+目标：请求地址`/admin/user/info`，请求方法`GET`，发送该请求后返回用户信息，暂时只需要用户名
+
+目标返回：
+
+```json
+{
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": {
+        "username": "登录用户对应的用户名"
+    }
+}
+```
+
+#### 10.1.1、新建用户信息实体类
+
+在`weblog-module-admin`模块下新建`/model/vo`包，在该包下新建`user`包统一放置用户模块相关的实体类，在`user`包下新建响应实体类`FindUserInfoRspVO`，按照上述目标配置响应模型：
+
+```java
+```
+
+#### 10.1.2、添加查询用户信息服务及实现类
+
+在`weblog-module-admin`模块下新建`/service/impl`包，在`service`包下创建用户服务接口`AdminUserService`，声明查询用户信息的方法：
+
+```java
+```
+
+在`impl`包下创建对应实现类`AdminUserServiceImpl`，实现该方法，从`Spring Security`上下文环境中读取用户信息：
+
+```java
+```
+
+#### 10.1.3、控制层添加查询用户信息接口
+
+在`weblog-module-admin`模块下新建`controller`包，在该包下创建控制器`AdminUserController`，添加查询用户信息的接口：
+
+```java
+```
+
+#### 10.1.4、测试
+
+重启项目，请求该接口，返回如下：
+
+```json
+```
+
+### 10.2、Pinia 存储用户信息，动态显示用户名
+
+在`api/user.js`文件中新增一个获取登录用户信息的接口：
+
+```js
+```
+
+在`stores`目录下新建一个`user.js`文件封装用户相关的全局状态，封装调用接口获取用户信息并存储的方法：
+
+```js
+```
+
+修改`Login.vue`文件的`onSubmit`方法，登录成功后调用上面封装的方法将用户信息存储到全局状态中：
+
+```js
+```
+
+修改`AdminHeader`组件，从全局状态中读取用户名：
+
+```vue
+```
+
+## 十一、用户信息、菜单信息持久化
+
+目标：解决目前存在的两个问题：
+
+- 打开页面后若是未调用登录接口全局状态中就没有用户信息
+- 折叠菜单刷新后会再展开
+
+安装依赖
+
+```shell
+pnpm i pinia-plugin-persistedstate
+```
+
+编辑 main.js 文件，将插件添加到 Pinia 实例上：
+
+```js
+// 省略...
+
+// 引入全局状态管理 Pinia
+import piniaPluginPersistedstate from "pinia-plugin-persistedstate"
+
+// 省略...
+
+const pinia = createPinia()
+pinia.use(piniaPluginPersistedstate)
+
+// 省略...
+```
+
+用户与菜单`Store`开启持久化，只需在对应文件的`defineStore`方法中加一个参数`{ persist: true }`：
+
+```js
+```
+
+封装`pinia`初始化、持久化等相关操作到`stores/index.js`文件中方便管理：
+
+```js
+```
+
+修改`main.js`引用刚创建的`pinia`实例：
+
+```js
+```
+
+## 十二、修改密码功能
+
+### 12.1、接口开发
+
+**目标：**
+
+- 请求地址：`/admin/password/update`
+- 请求方法：`POST`
+- 入参：
+  ```json
+  {
+    "username": "用户名",
+    "password": "新密码"
+  }
+  ```
+- 返回：
+  - 用户不存在，返回错误提示：
+    ```json
+    {
+      "success": false,
+      "message": "该用户不存在",
+      "code": "20003",
+      "data": null
+    }
+    ```
+  - 用户已存在，更新成功：
+    ```json
+    {
+      "success": true,
+      "message": null,
+      "code": null,
+      "data": null
+    }
+    ```
+
+#### 12.1.1、创建修改密码入参实体类
+
+首先在`weblog-module-admin`模块的`pom.xml`中引入参数校验依赖：
+
+```xml
+<!-- 入参校验 -->
+<dependency>
+		<groupId>jakarta.validation</groupId>
+		<artifactId>jakarta.validation-api</artifactId>
+</dependency>
+```
+
+在`weblog-module-admin`模块下的`/model/vo`包下新建`UpdateAdminUserPasswordReqVO`入参实体类，按照上述目标配置入参模型以及校验规则（用户名和密码不能为空）：
+
+```java
+```
+
+#### 12.1.2、向 UserMapper 中添加更新密码的方法
+
+编辑`weblog-module-common`模块中的`UserMapper`接口，添加`updatePasswordByUsername`默认方法, 代码如下：
+
+```java
+```
+
+#### 12.1.3、向用户服务中添加更新密码方法及实现
+
+首先在`ResponseCodeEnum`枚举类中，添加用户不存在的枚举值：
+
+```java
+USERNAME_NOT_FOUND("20003", "该用户不存在")
+```
+
+编辑`AdminUserService`，添加更新密码方法：
+
+```java
+public interface AdminUserService {
+    // ...省略
+
+    /**
+     * 修改密码
+     * @param updateAdminUserPasswordReqVO 更新密码入参
+     * @return Response
+     */
+    Response updatePassword(UpdateAdminUserPasswordReqVO updateAdminUserPasswordReqVO);
+}
+```
+
+在`AdminUserServiceImpl`中实现这个方法：
+
+```java
+```
+
+> 两个注意点：
+>
+> 1. 密码先加密后再存储到数据库中
+> 2. 通过返回的影响的记录条数 值进行判断，若等于 1, 则更新成功，同时意味着该用户存在，否则等于 0，则该用户不存在。这样做可以避免更改密码前先查询用户是否存在造成的`SQL`查询冗余
+
+#### 12.1.4、新建更新密码的接口
+
+在`AdminUserController`中添加更新密码的接口：
+
+```java
+```
+
+#### 12.1.5、测试
+
+重启项目，请求该接口
+
+**用户不存在：**
+
+入参：
+
+```json
+{
+  "username": "1",
+  "password": "1"
+}
+```
+
+返回：
+
+```json
+```
+
+**用户已存在：**
+
+入参：
+
+```json
+{
+  "username": "test",
+  "password": "123"
+}
+```
+
+返回：
+
+```json
+```
