@@ -10,8 +10,11 @@ import { login } from "@/api/admin/user"
 import { useRouter } from "vue-router"
 import { showMessage } from "@/utils/message.js"
 import { setToken } from "@/utils/cookie.js"
+import { useUserStore } from "@/stores/user.js"
 
 const router = useRouter()
+
+const userStore = useUserStore()
 
 const loginForm = reactive({
   username: "",
@@ -46,6 +49,8 @@ async function onsubmit() {
           showMessage("登录成功")
           let token = res.data.token
           setToken(token)
+
+          await userStore.setUserInfo()
           await router.push("/admin/index")
         } else {
           let message = res.message

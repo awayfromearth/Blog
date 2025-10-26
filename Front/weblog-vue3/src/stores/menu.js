@@ -9,4 +9,6 @@ export const useMenuStore = defineStore("menu", () => {
   }
 
   return { isMenuCollapsed, toggleMenuCollapsed }
+}, {
+  persist: true
 })

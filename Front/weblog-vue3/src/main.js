@@ -1,8 +1,6 @@
 import { createApp } from 'vue'
 import { installIcons } from "@/utils/iconsInstaller"
-import { createPinia } from "pinia"
-
-const pinia = createPinia()
+import pinia from "@/stores"
 
 import router from "./router/index"
 import App from './App.vue'

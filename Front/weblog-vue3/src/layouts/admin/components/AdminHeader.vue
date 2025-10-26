@@ -2,9 +2,11 @@
 import AvatarImg from "@/assets/images/avatar.jpg"
 
 import { useMenuStore } from "@/stores/menu"
+import { useUserStore } from "@/stores/user.js"
 import { useFullscreen } from "@vueuse/core"
 
 const menuStore = useMenuStore()
+const userStore = useUserStore()
 const { isFullscreen, toggle } = useFullscreen()
 
 function handleRefresh() {
@@ -49,7 +51,7 @@ function handleRefresh() {
         <span class="el-dropdown-link flex items-center justify-center text-gray-700 text-xs">
           <!-- 头像 Avatar -->
           <el-avatar class="mr-2" :size="25" :src="AvatarImg" />
-          Admin
+          {{ userStore.userInfo.username }}
           <el-icon class="el-icon--right">
             <arrow-down />
           </el-icon>

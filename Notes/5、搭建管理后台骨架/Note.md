@@ -1837,7 +1837,7 @@ function handleCloseTab(command) {
 }
 ```
 
-## 十、右侧用户名
+## 十、右侧用户名展示
 
 ### 10.1、开发获取当前登录用户信息接口
 
@@ -1861,6 +1861,24 @@ function handleCloseTab(command) {
 在`weblog-module-admin`模块下新建`/model/vo`包，在该包下新建`user`包统一放置用户模块相关的实体类，在`user`包下新建响应实体类`FindUserInfoRspVO`，按照上述目标配置响应模型：
 
 ```java
+package com.cm.weblog.admin.model.vo.user;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * 获取用户信息接口返参实体类
+ */
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+public class FindUserInfoRspVO {
+    private String username;
+}
+
 ```
 
 #### 10.1.2、添加查询用户信息服务及实现类
@@ -1868,11 +1886,50 @@ function handleCloseTab(command) {
 在`weblog-module-admin`模块下新建`/service/impl`包，在`service`包下创建用户服务接口`AdminUserService`，声明查询用户信息的方法：
 
 ```java
+package com.cm.weblog.admin.service;
+
+import com.cm.weblog.admin.model.vo.user.FindUserInfoRspVO;
+import com.cm.weblog.common.utils.Response;
+
+/**
+ * 用户服务接口
+ */
+public interface AdminUserService {
+    /**
+     * 获取当前登录用户信息
+     * @return 响应用户信息
+     */
+    Response<FindUserInfoRspVO> findUserInfo();
+}
+
 ```
 
 在`impl`包下创建对应实现类`AdminUserServiceImpl`，实现该方法，从`Spring Security`上下文环境中读取用户信息：
 
 ```java
+package com.cm.weblog.admin.service.impl;
+
+import com.cm.weblog.admin.model.vo.user.FindUserInfoRspVO;
+import com.cm.weblog.admin.service.AdminUserService;
+import com.cm.weblog.common.utils.Response;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+
+@Service
+public class AdminUserServiceImpl implements AdminUserService {
+    @Override
+    public Response<FindUserInfoRspVO> findUserInfo() {
+        // 获取上下文中存储的信息
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        // 获取用户名
+        String username = authentication.getName();
+
+        return Response.success(FindUserInfoRspVO.builder().username(username).build());
+    }
+}
+
 ```
 
 #### 10.1.3、控制层添加查询用户信息接口
@@ -1880,6 +1937,38 @@ function handleCloseTab(command) {
 在`weblog-module-admin`模块下新建`controller`包，在该包下创建控制器`AdminUserController`，添加查询用户信息的接口：
 
 ```java
+package com.cm.weblog.admin.controller;
+
+import com.cm.weblog.admin.model.vo.user.FindUserInfoRspVO;
+import com.cm.weblog.admin.service.AdminUserService;
+import com.cm.weblog.common.aspect.ApiOperationLog;
+import com.cm.weblog.common.utils.Response;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import javax.annotation.Resource;
+
+/**
+ * 用户相关接口的控制器
+ */
+@RestController
+@RequestMapping("/admin")
+@Api(tags = "Admin 用户模块")
+public class AdminUserController {
+    @Resource
+    private AdminUserService adminUserService;
+    
+    @GetMapping("/uer/info")
+    @ApiOperation(value = "获取用户信息")
+    @ApiOperationLog(description = "获取用户信息")
+    public Response<FindUserInfoRspVO> findUserInfo() {
+        return adminUserService.findUserInfo();
+    }
+}
+
 ```
 
 #### 10.1.4、测试
@@ -1887,28 +1976,90 @@ function handleCloseTab(command) {
 重启项目，请求该接口，返回如下：
 
 ```json
+{
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": {
+        "username": "test"
+    }
+}
 ```
 
 ### 10.2、Pinia 存储用户信息，动态显示用户名
 
-在`api/user.js`文件中新增一个获取登录用户信息的接口：
+在`api/admin/user.js`文件中新增一个获取登录用户信息的接口：
 
 ```js
+/**
+ * 获取当前登录用户信息
+ * @returns {Promise<axios.AxiosResponse<any>>}
+ */
+export function getUserInfo() {
+  return axios.get("admin/user/info")
+}
 ```
 
 在`stores`目录下新建一个`user.js`文件封装用户相关的全局状态，封装调用接口获取用户信息并存储的方法：
 
 ```js
+import { defineStore } from "pinia"
+import { ref } from "vue"
+import { getUserInfo } from "@/api/admin/user.js"
+
+export const useUserStore = defineStore("user", () => {
+    const userInfo = ref({})
+    
+    async function setUserInfo() {
+        try {
+            const { success, data } = await getUserInfo()
+            if (success) {
+                userInfo.value = data
+            }
+        } catch(e) {
+            console.log(e)
+        }
+        
+        return { userInfo, setUserInfo }
+    }
+})
 ```
 
 修改`Login.vue`文件的`onSubmit`方法，登录成功后调用上面封装的方法将用户信息存储到全局状态中：
 
 ```js
+import { useUserStore } from "@/stores/user.js"
+
+const userStore = useUserStore()
+
+async function onsubmit() {
+    // ... 省略
+    
+   	userStore.setUserInfo()
+}
 ```
 
 修改`AdminHeader`组件，从全局状态中读取用户名：
 
 ```vue
+<script setup>
+import { useUserStore } from "@/stores/user.js"
+
+const userStore = useUserStore()
+</script>
+
+<template>
+  <span class="el-dropdown-link flex items-center justify-center text-gray-700 text-xs">
+	<!-- 头像 Avatar -->
+	<el-avatar class="mr-2" :size="25" :src="AvatarImg" />
+	  {{ userStore.userInfo.username }}
+	  <el-icon class="el-icon--right">
+		<arrow-down />
+	  </el-icon>
+  </span>
+</template>
+
+<style scoped>
 ```
 
 ## 十一、用户信息、菜单信息持久化
@@ -1940,19 +2091,31 @@ pinia.use(piniaPluginPersistedstate)
 // 省略...
 ```
 
-用户与菜单`Store`开启持久化，只需在对应文件的`defineStore`方法中加一个参数`{ persist: true }`：
+用户与菜单`Store`开启持久化，只需在对应文件的`defineStore`方法中加一个参数`{ persist: true }`，像下面这样：
 
 ```js
+export const useSomeStore = defineStore("someType", () => {
+    // set something
+}, { persist: true })
 ```
 
 封装`pinia`初始化、持久化等相关操作到`stores/index.js`文件中方便管理：
 
 ```js
+import { createPinia } from "pinia"
+
+import piniaPluginPersistedstate from "pinia-plugin-persistedstate"
+
+const pinia = createPinia()
+pinia.use(piniaPluginPersistedstate)
+
+export default pinia
 ```
 
 修改`main.js`引用刚创建的`pinia`实例：
 
 ```js
+import pinia from "@/stores"
 ```
 
 ## 十二、修改密码功能
@@ -2005,6 +2168,7 @@ pinia.use(piniaPluginPersistedstate)
 在`weblog-module-admin`模块下的`/model/vo`包下新建`UpdateAdminUserPasswordReqVO`入参实体类，按照上述目标配置入参模型以及校验规则（用户名和密码不能为空）：
 
 ```java
+
 ```
 
 #### 12.1.2、向 UserMapper 中添加更新密码的方法
@@ -2012,6 +2176,7 @@ pinia.use(piniaPluginPersistedstate)
 编辑`weblog-module-common`模块中的`UserMapper`接口，添加`updatePasswordByUsername`默认方法, 代码如下：
 
 ```java
+
 ```
 
 #### 12.1.3、向用户服务中添加更新密码方法及实现
@@ -2040,6 +2205,7 @@ public interface AdminUserService {
 在`AdminUserServiceImpl`中实现这个方法：
 
 ```java
+
 ```
 
 > 两个注意点：
@@ -2052,6 +2218,7 @@ public interface AdminUserService {
 在`AdminUserController`中添加更新密码的接口：
 
 ```java
+
 ```
 
 #### 12.1.5、测试
@@ -2072,6 +2239,7 @@ public interface AdminUserService {
 返回：
 
 ```json
+
 ```
 
 **用户已存在：**
@@ -2088,4 +2256,5 @@ public interface AdminUserService {
 返回：
 
 ```json
+
 ```
