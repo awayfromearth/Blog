@@ -2168,6 +2168,34 @@ import pinia from "@/stores"
 在`weblog-module-admin`模块下的`/model/vo`包下新建`UpdateAdminUserPasswordReqVO`入参实体类，按照上述目标配置入参模型以及校验规则（用户名和密码不能为空）：
 
 ```java
+package com.cm.weblog.admin.model.vo.user;
+
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import javax.validation.constraints.NotBlank;
+
+/**
+ * 修改密码接口入参实体类
+ */
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+@ApiModel(value = "修改用户密码入参")
+public class UpdatePasswordReqVO {
+    @NotBlank(message = "用户名不能为空")
+    @ApiModelProperty(value = "用户名")
+    private String username;
+    
+    @NotBlank(message = "密码不能为空")
+    @ApiModelProperty(value = "密码")
+    private String password;
+}
 
 ```
 
@@ -2176,7 +2204,16 @@ import pinia from "@/stores"
 编辑`weblog-module-common`模块中的`UserMapper`接口，添加`updatePasswordByUsername`默认方法, 代码如下：
 
 ```java
-
+default int updatePasswordByUsername(String username, String password) {
+	LambdaUpdateWrapper<UserDO> wrapper = new LambdaUpdateWrapper<>();
+        
+	wrapper.set(UserDO::getPassword, password);
+	wrapper.set(UserDO::getUpdateTime, LocalDateTime.now());
+        
+	wrapper.eq(UserDO::getUsername, username);
+        
+	return update(null, wrapper);
+}
 ```
 
 #### 12.1.3、向用户服务中添加更新密码方法及实现
@@ -2205,6 +2242,46 @@ public interface AdminUserService {
 在`AdminUserServiceImpl`中实现这个方法：
 
 ```java
+package com.cm.weblog.admin.service.impl;
+
+import com.cm.weblog.admin.model.vo.user.FindUserInfoRspVO;
+import com.cm.weblog.admin.model.vo.user.UpdateAdminUserPasswordReqVO;
+import com.cm.weblog.admin.service.AdminUserService;
+import com.cm.weblog.common.domain.mapper.UserMapper;
+import com.cm.weblog.common.enums.ResponseCodeEnum;
+import com.cm.weblog.common.utils.Response;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+
+@Service
+public class AdminUserServiceImpl implements AdminUserService {
+    @Resource
+    private UserMapper userMapper;
+    
+    @Resource
+    private PasswordEncoder passwordEncoder;
+    
+    // ...省略
+
+    @Override
+    public Response<?> updatePassword(UpdateAdminUserPasswordReqVO updateAdminUserPasswordReqVO) {
+        // 1、拿到用户名和新密码
+        String username = updateAdminUserPasswordReqVO.getUsername();
+        String password = updateAdminUserPasswordReqVO.getPassword();
+        
+        // 2、加密密码
+        String encodePassword = passwordEncoder.encode(password);
+        
+        // 3、更新到数据库
+        int count = userMapper.updatePasswordByUsername(username, encodePassword);
+        
+        return count > 0 ? Response.success() : Response.fail(ResponseCodeEnum.USERNAME_NOT_FOUND);
+    }
+}
 
 ```
 
@@ -2218,7 +2295,12 @@ public interface AdminUserService {
 在`AdminUserController`中添加更新密码的接口：
 
 ```java
-
+@PostMapping("/password/update")
+@ApiOperation(value = "修改用户密码")
+@ApiOperationLog(description = "修改用户密码")
+public Response<?> updatePassword(@RequestBody @Validated UpdateAdminUserPasswordReqVO updateAdminUserPasswordReqVO) {
+	return adminUserService.updatePassword(updateAdminUserPasswordReqVO);
+}
 ```
 
 #### 12.1.5、测试
@@ -2239,7 +2321,12 @@ public interface AdminUserService {
 返回：
 
 ```json
-
+{
+    "success": false,
+    "message": "该用户不存在",
+    "code": "20003",
+    "data": null
+}
 ```
 
 **用户已存在：**
@@ -2256,5 +2343,11 @@ public interface AdminUserService {
 返回：
 
 ```json
-
+{
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": null
+}
 ```
+
