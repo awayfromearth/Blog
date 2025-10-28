@@ -2118,9 +2118,52 @@ export default pinia
 import pinia from "@/stores"
 ```
 
-## 十二、修改密码功能
+## 十二、退出登录功能
 
-### 12.1、接口开发
+在`utils`目录下新建`model.js`文件，封装展示确认框的工具函数：
+
+```js
+export function showModel(content = "提示内容", type = "warning", title = "") {
+  return ElMessageBox.confirm(
+    content,
+    title,
+    {
+      confirmButtonText: "确定",
+      cancelButtonText: "取消",
+      type
+    }
+  )
+}
+```
+
+向用户`Store`中添加退出登录的方法，调用时清除`Token`以及用户信息：
+
+```js
+function logout() {
+  removeToken()
+  userInfo.value = {}
+}
+
+return { userInfo, setUserInfo, logout }
+```
+
+给`AdminHeader`中下拉菜单选项——退出登录绑定事件，调用后显示确认框，确认后调用退出登录方法：
+
+```js
+function handleDropdownCommand(command) {
+  if (command === "logout") {
+    showModel("是否确认要退出登录？").then(() => {
+      userStore.logout()
+      showMessage("退出登录成功！")
+      router.push("/login")
+    })
+  }
+}
+```
+
+## 十三、修改密码功能
+
+### 13.1、接口开发
 
 **目标：**
 
@@ -2153,7 +2196,7 @@ import pinia from "@/stores"
     }
     ```
 
-#### 12.1.1、创建修改密码入参实体类
+#### 13.1.1、创建修改密码入参实体类
 
 首先在`weblog-module-admin`模块的`pom.xml`中引入参数校验依赖：
 
@@ -2199,7 +2242,7 @@ public class UpdatePasswordReqVO {
 
 ```
 
-#### 12.1.2、向 UserMapper 中添加更新密码的方法
+#### 13.1.2、向 UserMapper 中添加更新密码的方法
 
 编辑`weblog-module-common`模块中的`UserMapper`接口，添加`updatePasswordByUsername`默认方法, 代码如下：
 
@@ -2216,7 +2259,7 @@ default int updatePasswordByUsername(String username, String password) {
 }
 ```
 
-#### 12.1.3、向用户服务中添加更新密码方法及实现
+#### 13.1.3、向用户服务中添加更新密码方法及实现
 
 首先在`ResponseCodeEnum`枚举类中，添加用户不存在的枚举值：
 
@@ -2290,7 +2333,7 @@ public class AdminUserServiceImpl implements AdminUserService {
 > 1. 密码先加密后再存储到数据库中
 > 2. 通过返回的影响的记录条数 值进行判断，若等于 1, 则更新成功，同时意味着该用户存在，否则等于 0，则该用户不存在。这样做可以避免更改密码前先查询用户是否存在造成的`SQL`查询冗余
 
-#### 12.1.4、新建更新密码的接口
+#### 13.1.4、新建更新密码的接口
 
 在`AdminUserController`中添加更新密码的接口：
 
@@ -2303,7 +2346,7 @@ public Response<?> updatePassword(@RequestBody @Validated UpdateAdminUserPasswor
 }
 ```
 
-#### 12.1.5、测试
+#### 13.1.5、测试
 
 重启项目，请求该接口
 
@@ -2351,3 +2394,211 @@ public Response<?> updatePassword(@RequestBody @Validated UpdateAdminUserPasswor
 }
 ```
 
+### 13.2、前端功能开发
+
+#### 13.2.1、对话框与表单搭建
+
+向`AdminHeader`组件中添加`ElementPlus`的对话框组件与表单组件，并且点击头像下拉菜单中的修改密码项时弹出这个对话框，监听`store`中的`username`值，如果有变化，则重新设置回`form`表单中即可：
+
+```vue
+<script setup>
+import AvatarImg from "@/assets/images/avatar.jpg"
+
+import { useMenuStore } from "@/stores/menu"
+import { useUserStore } from "@/stores/user.js"
+import { useFullscreen } from "@vueuse/core"
+import { ref, reactive } from "vue"
+
+const menuStore = useMenuStore()
+const userStore = useUserStore()
+const { isFullscreen, toggle } = useFullscreen()
+
+function handleRefresh() {
+  location.reload()
+}
+
+const dialogVisible = ref(false)
+const formRef = ref(null)
+const form = reactive({
+  username: userStore.userInfo.username || '',
+  password: '',
+  rePassword: ''
+})
+const rules = {
+  username: [
+    {
+      required: true,
+      message: '用户名不能为空',
+      trigger: 'blur'
+    }
+  ],
+  password: [
+    {
+      required: true,
+      message: '密码不能为空',
+      trigger: 'blur',
+    },
+  ],
+  rePassword: [
+    {
+      required: true,
+      message: '确认密码不能为空',
+      trigger: 'blur',
+    },
+  ]
+}
+function handleDropdownCommand(command) {
+  if (command === "updatePassword") {
+    dialogVisible.value = true
+  }
+
+  if (command === "logout") {
+    showModel("是否确认要退出登录？").then(() => {
+      userStore.logout()
+      showMessage("退出登录成功！")
+      router.push("/login")
+    })
+  }
+}
+</script>
+
+<template>
+  <!-- 通过 flex 指定水平布局 -->
+  <!-- 设置背景色为白色、高度为 64px，padding-right 为 4， border-bottom 为 slate 200 -->
+  <div class="bg-white h-[64px] flex pr-4 border-b border-slate-100">
+    <!-- 左边栏收缩、展开 -->
+    <div class="w-[42px] h-[64px] cursor-pointer flex items-center justify-center text-gray-700 hover:bg-gray-200" @click="menuStore.toggleMenuCollapsed">
+      <el-icon>
+        <Fold v-if="!menuStore.isMenuCollapsed" />
+        <Expand v-else />
+      </el-icon>
+    </div>
+
+    <!-- 右边容器，通过 ml-auto 让其在父容器的右边 -->
+    <div class="ml-auto flex">
+      <!-- 点击刷新页面 -->
+      <el-tooltip class="box-item" effect="dark" content="刷新" placement="bottom">
+        <div class="w-[42px] h-[64px] cursor-pointer flex items-center justify-center text-gray-700 hover:bg-gray-200" @click="handleRefresh">
+          <el-icon>
+            <Refresh />
+          </el-icon>
+        </div>
+      </el-tooltip>
+      <!-- 点击全屏展示 -->
+      <el-tooltip class="box-item" effect="dark" :content="isFullscreen ? '取消全屏' : '全屏'" placement="bottom">
+        <div class="w-[42px] h-[64px] cursor-pointer flex items-center justify-center text-gray-700 mr-2 hover:bg-gray-200" @click="toggle">
+          <el-icon>
+            <FullScreen v-if="!isFullscreen"/>
+            <Aim v-else/>
+          </el-icon>
+        </div>
+      </el-tooltip>
+
+      <!-- 登录用户头像 -->
+      <el-dropdown trigger="click" class="flex items-center justify-center" @command="handleDropdownCommand">
+        <span class="el-dropdown-link flex items-center justify-center text-gray-700 text-xs">
+          <!-- 头像 Avatar -->
+          <el-avatar class="mr-2" :size="25" :src="AvatarImg" />
+          {{ userStore.userInfo.username }}
+          <el-icon class="el-icon--right">
+            <arrow-down />
+          </el-icon>
+        </span>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="updatePassword">修改密码</el-dropdown-item>
+            <el-dropdown-item command="logout">退出登录</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </div>
+  </div>
+  <!-- 修改密码 -->
+  <el-dialog v-model="dialogVisible" title="修改密码" width="40%" :draggable ="true" :close-on-click-modal="false" :close-on-press-escape="false">
+    <el-form ref="formRef" :rules="rules" :model="form">
+      <el-form-item label="用户名" prop="username" label-width="120px">
+        <!-- 输入框组件 -->
+        <el-input size="large" v-model="form.username" placeholder="请输入用户名" clearable disabled />
+      </el-form-item>
+      <el-form-item label="密码" prop="password" label-width="120px">
+        <el-input size="large" type="password" v-model="form.password" placeholder="请输入密码"
+                  clearable show-password />
+      </el-form-item>
+      <el-form-item label="确认密码" prop="rePassword" label-width="120px">
+        <el-input size="large" type="password" v-model="form.rePassword" placeholder="请确认密码"
+                  clearable show-password />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="dialogVisible = false">
+          提交
+        </el-button>
+      </span>
+    </template>
+  </el-dialog>
+</template>
+
+<style scoped>
+.el-dropdown-link {
+  outline: none;
+}
+:deep(.el-input.is-disabled .el-input__inner) {
+  background-color: transparent;
+}
+</style>
+
+```
+
+#### 13.2.2、功能实现
+
+向`/api/admin/user.js`文件中继续封装修改密码的请求：
+
+```js
+/**
+ * 修改密码
+ * @param data 用户名和新密码
+ * @returns { Promise<axios.AxiosResponse<any>> }
+ */
+export function updatePassword(data) {
+  return axios.post("/admin/password/update", data)
+}
+```
+
+`AdminHeader`组件中处理表单提交事件，给提交按钮绑定点击事件，触发函数`onSubmit`，函数内容如下：
+
+1. 校验表单
+2. 通过校验后发送请求
+
+```js
+function onSubmit() {
+  formRef.value.validate(async valid => {
+    if (valid) {
+      if (form.password !== form.rePassword) {
+        return showMessage("两次密码输入不一致，请检查！", "warning")
+      }
+
+      isSubmitButtonLoading.value = true
+
+      try {
+        const { success, message } = await updatePassword(form)
+        if (success) {
+          showMessage("密码重置成功，请重新登录！")
+
+          userStore.logout()
+
+          dialogVisible.value = false
+          router.push('/login')
+        } else {
+          showMessage(message, "error")
+        }
+      } catch(e) {
+        console.log(e)
+      } finally {
+        isSubmitButtonLoading.value = false
+      }
+    }
+  })
+}
+```

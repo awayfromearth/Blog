@@ -1,6 +1,7 @@
 import { defineStore } from "pinia"
 import { ref } from "vue"
 import { getUserInfo } from "@/api/admin/user.js"
+import { removeToken } from "@/utils/cookie"
 
 export const useUserStore = defineStore("user", () => {
     const userInfo = ref({})
@@ -16,7 +17,12 @@ export const useUserStore = defineStore("user", () => {
         }
     }
 
-    return { userInfo, setUserInfo }
+    function logout() {
+        removeToken()
+        userInfo.value = {}
+    }
+
+    return { userInfo, setUserInfo, logout }
 }, {
     persist: true
 })

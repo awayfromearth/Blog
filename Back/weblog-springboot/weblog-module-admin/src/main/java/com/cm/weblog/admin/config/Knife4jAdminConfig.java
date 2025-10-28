@@ -22,7 +22,7 @@ public class Knife4jAdminConfig {
                 .apiInfo(buildApiInfo())
                 .groupName("Admin 后台接口")
                 .select()
-                .apis(RequestHandlerSelectors.basePackage("com.cm.weblog.web.admin.controller"))
+                .apis(RequestHandlerSelectors.basePackage("com.cm.weblog.admin.controller"))
                 .paths(PathSelectors.any())
                 .build();
     }
