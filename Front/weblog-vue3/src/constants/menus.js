@@ -10,7 +10,7 @@ export const MENUS = [
     path: "/admin/article/list"
   },
   {
-    name: "类别管理",
+    name: "分类管理",
     icon: "FolderOpened",
     path: "/admin/category/list"
   },

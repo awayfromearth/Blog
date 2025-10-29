@@ -40,7 +40,7 @@ const routes = [
                 path: "/admin/category/list",
                 component: () => import("@/pages/admin/CategoryList.vue"),
                 meta: {
-                    title: "类别管理"
+                    title: "分类管理"
                 }
             },
             {
