@@ -156,6 +156,36 @@ CREATE TABLE `t_category` (
 在`weblog-module-common`模块中的`/domain/dos`包下，创建`CategoryDO`实体类，字段与表中字段一一对应：
 
 ```java
+package com.cm.weblog.common.domain.dos;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+@TableName("t_category")
+public class CategoryDO {
+    @TableId(type = IdType.AUTO)
+    private Long id;
+    
+    private String name;
+    
+    private LocalDateTime createTime;
+    
+    private LocalDateTime updateTime;
+    
+    private Boolean isDeleted;
+}
+
 ```
 
 #### 3.1.3、创建对应的 mapper
@@ -163,6 +193,26 @@ CREATE TABLE `t_category` (
 在`/domain/mapper`包下，创建`CategoryMapper`接口，新建根据名称查询类别的默认方法`selectByName`：
 
 ```java
+package com.cm.weblog.common.domain.mapper;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.cm.weblog.common.domain.dos.CategoryDO;
+
+public interface CategoryMapper extends BaseMapper<CategoryDO> {
+    /**
+     * 根据名称查询类别
+     * @param name 名称
+     * @return 分类
+     */
+    default CategoryDO selectByName(String name) {
+        LambdaQueryWrapper<CategoryDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(CategoryDO::getName, name);
+
+        return selectOne(wrapper);
+    }
+}
+
 ```
 
 #### 3.1.4、创建入参实体类
@@ -179,4 +229,214 @@ CREATE TABLE `t_category` (
 编辑`weblog-module-admin`子模块，在`vo`包下，新增`category`包，后续所有和分类相关的`VO`实体类均放在此包下，然后创建`AddCategoryReqVO`入参实体类，代码如下：
 
 ```java
+package com.cm.weblog.admin.model.vo.category;
+
+import io.swagger.annotations.ApiModel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.hibernate.validator.constraints.Length;
+
+import javax.validation.constraints.NotBlank;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+@ApiModel(value = "添加分类入参")
+public class AddCategoryVO {
+    @NotBlank(message = "分类名称不能为空")
+    @Length(min = 1, max = 10, message = "分类名称字数限制在 1 ~ 10 之间")
+    private String name;
+}
+
 ```
+
+#### 3.1.5、添加分类服务及其实现类
+
+在`service`包下创建`AdminCategoryService`接口，统一规划分类服务的功能，在该接口中添加新增分类的方法`addCategory`：
+
+```java
+package com.cm.weblog.admin.service;
+
+import com.cm.weblog.admin.model.vo.category.AddCategoryReqVO;
+import com.cm.weblog.common.utils.Response;
+
+public interface AdminCategoryService {
+    Response<?> addCategory(AddCategoryReqVO addCategoryReqVO);
+}
+
+```
+
+接口规范完成后向`RespondCodeEnum`中添加重复添加分类的枚举值：
+
+```java
+CATEGORY_NAME_IS_EXISTED("20005", "该分类已存在，请勿重复添加！")
+```
+
+然后在`impl`包下创建对应的实现类`AdminCategoryServiceImpl`，实现刚才添加的方法：
+
+```java
+package com.cm.weblog.admin.service.impl;
+
+import com.cm.weblog.admin.model.vo.category.AddCategoryReqVO;
+import com.cm.weblog.admin.service.AdminCategoryService;
+import com.cm.weblog.common.domain.dos.CategoryDO;
+import com.cm.weblog.common.domain.mapper.CategoryMapper;
+import com.cm.weblog.common.enums.ResponseCodeEnum;
+import com.cm.weblog.common.exception.BizException;
+import com.cm.weblog.common.utils.Response;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+import java.util.Objects;
+
+@Slf4j
+@Service
+public class AdminCategoryServiceImpl implements AdminCategoryService {
+    @Resource
+    private CategoryMapper categoryMapper;
+
+    @Override
+    public Response<?> addCategory(AddCategoryReqVO addCategoryReqVO) {
+        String categoryName = addCategoryReqVO.getName();
+
+        CategoryDO categoryDO = categoryMapper.selectByName(categoryName);
+
+        if (Objects.nonNull(categoryDO)) {
+            log.warn("分类名称：{} 已存在", categoryName);
+            throw new BizException(ResponseCodeEnum.CATEGORY_NAME_IS_EXISTED);
+        }
+
+        CategoryDO insertCategoryDO = CategoryDO.builder()
+                .name(categoryName.trim())
+                .build();
+
+        categoryMapper.insert(insertCategoryDO);
+
+        return Response.success();
+    }
+}
+
+```
+
+#### 3.1.6、控制层中添加接口
+
+在`controller`包下创建`AdminCategoryController`分类控制器，添加目标中的`/admin/category/add`接口：
+
+```java
+package com.cm.weblog.admin.controller;
+
+import com.cm.weblog.admin.model.vo.category.AddCategoryReqVO;
+import com.cm.weblog.admin.service.AdminCategoryService;
+import com.cm.weblog.common.aspect.ApiOperationLog;
+import com.cm.weblog.common.utils.Response;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import javax.annotation.Resource;
+
+@RestController
+@RequestMapping("/admin")
+@Api(tags = "Admin 分类模块")
+public class AdminCategoryController {
+    @Resource
+    private AdminCategoryService adminCategoryService;
+
+    @PostMapping("/category/add")
+    @ApiOperation(value = "添加分类")
+    @ApiOperationLog(description = "添加分类")
+    public Response<?> addCategory(@RequestBody @Validated AddCategoryReqVO addCategoryReqVO) {
+        return adminCategoryService.addCategory(addCategoryReqVO);
+    }
+}
+
+```
+
+#### 3.1.7、测试
+
+**分类名称为空（字数不足）入参：**
+
+```json
+{
+    "name": ""
+}
+```
+
+返回：
+
+```json
+{
+    "success": false,
+    "message": "name 分类名称字数限制在 1 ~ 10 之间，当前值：’'；name 分类名称不能为空，当前值：’'；",
+    "code": "10001",
+    "data": null
+}
+```
+
+**分类名称字数过多入参：**
+
+```json
+{
+    "name": "012345678901234567890123"
+}
+```
+
+返回：
+
+```json
+{
+    "success": false,
+    "message": "name 分类名称字数限制在 1 ~ 10 之间，当前值：’012345678901234567890123'；",
+    "code": "10001",
+    "data": null
+}
+```
+
+**成功入参**：
+
+```json
+{
+    "name": "Java"
+}
+```
+
+返回：
+
+```json
+{
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": null
+}
+```
+
+**分类名称重复入参：**
+
+```json
+{
+    "name": "Java"
+}
+```
+
+返回：
+
+```json
+{
+    "success": false,
+    "message": "该分类已存在，请勿重复添加！",
+    "code": "20005",
+    "data": null
+}
+```
+
+
+

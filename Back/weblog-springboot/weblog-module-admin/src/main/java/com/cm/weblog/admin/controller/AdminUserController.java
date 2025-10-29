@@ -16,7 +16,6 @@ import javax.annotation.Resource;
  * 用户相关接口的控制器
  */
 @RestController
-@Slf4j
 @RequestMapping("/admin")
 @Api(tags = "Admin 用户模块")
 public class AdminUserController {
