@@ -68,9 +68,9 @@ public class GlobalExceptionHandler {
                     sb.append(error.getField())
                             .append(" ")
                             .append(error.getDefaultMessage())
-                            .append("，当前值：’")
+                            .append("，当前值：‘")
                             .append(error.getRejectedValue())
-                            .append("'；")
+                            .append("’；")
             );
         });
 
