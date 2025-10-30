@@ -442,3 +442,119 @@ public class AdminCategoryController {
 
 #### 3.2.1、模态框及表单样式布局
 
+给新增分类按钮绑定点击事件，点击后展示模态框：
+
+```vue
+<script setup>
+import { ref } from "vue"
+
+const dialogVisible = ref(false)
+</script>
+
+<template>
+  <!-- 省略其它 -->
+
+  <!-- 新增按钮 -->
+  <div class="mb-5">
+    <el-button type="primary" @click="dialogVisible = true">
+      <el-icon class="mr-1">
+        <Plus />
+      </el-icon>
+      新增</el-button>
+  </div>
+
+  <el-dialog v-model="dialogVisible" title="添加文章分类" width="40%" :draggable ="true" :close-on-click-modal="false" :close-on-press-escape="false"></el-dialog>
+</template>
+```
+
+向模态框中添加表单以及绑定表单变量：
+
+```vue
+<script setup>
+import { ref, reactive } from "vue"
+
+const form = reactive({
+  name: ""
+})
+
+const formRef = ref(null)
+
+const rules = {
+  name: [
+    {
+      required: true,
+      message: "分类名称不能为空",
+      trigger: "blur"
+    },
+    {
+      min: 1,
+      max: 10,
+      message: "分类名称字数要求大于 1 个字符，小于 10 个字符",
+      trigger: "blur"
+    }
+  ]
+}
+</script>
+
+<template>
+  <!-- 省略其它 -->
+  <el-dialog v-model="dialogVisible" title="添加文章分类" width="40%" :draggable ="true" :close-on-click-modal="false" :close-on-press-escape="false">
+    <el-form ref="formRef" :rules="rules" :model="form">
+      <el-form-item label="分类名称" prop="name" label-width="80px">
+        <!-- 输入框组件 -->
+        <el-input size="large" v-model="form.name" placeholder="请输入分类名称" maxlength="10" show-word-limit clearable/>
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="onSubmit">
+          提交
+        </el-button>
+      </span>
+    </template>
+  </el-dialog>
+</template>
+```
+
+#### 3.2.2、功能开发
+
+**封装请求**
+
+在`/api/admin`目录下新建`category.js`，用来统一存放分类相关的请求，并在该文件中添加新增分类的请求：
+
+```js
+import axios from "@/utils/axios"
+
+/**
+ * 添加分类
+ * @param data 分类
+ * @returns {Promise<axios.AxiosResponse<any>>}
+ */
+export function addCategory(data) {
+  return axios.post("/admin/category/add", data)
+}
+```
+
+**处理表单提交**
+
+完善刚才提交按钮绑定的函数：
+
+```js
+function onSubmit() {
+  formRef.value.validate(async (valid) => {
+    if (valid) {
+      const { success, message } = await addCategory(form)
+      if (success) {
+        showMessage("添加成功")
+        dialogVisible.value = false
+        form.name = ""
+
+        // 渲染表格数据，暂未完成接口
+      } else {
+        showMessage(message, "error")
+      }
+    }
+  })
+}
+```

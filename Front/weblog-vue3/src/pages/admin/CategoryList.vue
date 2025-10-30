@@ -1,5 +1,49 @@
 <script setup>
 import { Search, RefreshRight } from "@element-plus/icons-vue"
+import { ref, reactive } from "vue"
+import { addCategory } from "@/api/admin/category"
+import { showMessage } from "@/utils/message"
+
+const dialogVisible = ref(false)
+
+const form = reactive({
+  name: ""
+})
+
+const formRef = ref(null)
+
+const rules = {
+  name: [
+    {
+      required: true,
+      message: "分类名称不能为空",
+      trigger: "blur"
+    },
+    {
+      min: 1,
+      max: 10,
+      message: "分类名称字数要求大于 1 个字符，小于 10 个字符",
+      trigger: "blur"
+    }
+  ]
+}
+
+function onSubmit() {
+  formRef.value.validate(async (valid) => {
+    if (valid) {
+      const { success, message } = await addCategory(form)
+      if (success) {
+        showMessage("添加成功")
+        dialogVisible.value = false
+        form.name = ""
+
+        // 渲染表格数据，暂未完成接口
+      } else {
+        showMessage(message, "error")
+      }
+    }
+  })
+}
 </script>
 
 <template>
@@ -25,7 +69,7 @@ import { Search, RefreshRight } from "@element-plus/icons-vue"
     <el-card shadow="never">
       <!-- 新增按钮 -->
       <div class="mb-5">
-        <el-button type="primary">
+        <el-button type="primary" @click="dialogVisible = true">
           <el-icon class="mr-1">
             <Plus />
           </el-icon>
@@ -58,5 +102,23 @@ import { Search, RefreshRight } from "@element-plus/icons-vue"
       </div>
 
     </el-card>
+
+    <el-dialog v-model="dialogVisible" title="添加文章分类" width="40%" :draggable ="true" :close-on-click-modal="false" :close-on-press-escape="false">
+      <el-form ref="formRef" :rules="rules" :model="form">
+        <el-form-item label="分类名称" prop="name" label-width="80px" class="align-middle">
+          <!-- 输入框组件 -->
+          <el-input size="large" v-model="form.name" placeholder="请输入分类名称" maxlength="10" show-word-limit clearable/>
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="dialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="onSubmit">
+            提交
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
