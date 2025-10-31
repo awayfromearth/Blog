@@ -100,6 +100,30 @@ import { Search, RefreshRight } from "@element-plus/icons-vue"
 </el-card>
 ```
 
+### 2.4、组件中文化
+
+修改`App.vue`文件内容，配置中文：
+
+```vue
+<script setup>
+import zhCn from "element-plus/dist/locale/zh-cn"
+
+const locale = zhCn
+</script>
+
+<template>
+  <el-config-provider :locale="locale">
+    <router-view />
+  </el-config-provider>
+</template>
+
+<style>
+#nprogress .bar {
+  background: #409eff !important;
+}
+</style>
+```
+
 ## 三、新增分类功能开发
 
 ### 3.1、新增分类接口开发
