@@ -587,3 +587,375 @@ function onSubmit() {
 
 ### 4.1、接口开发
 
+#### 4.1.1、设计接口模型
+
+**定义入参格式：**
+
+```json
+{
+    "current": 1, // 页码
+    "size": 10, // 每页的数据量
+    "name": "", // 要模糊查询的分类名称
+    "startDate": "" // 要搜索的创建时间起始值
+    "endDate": "" // 要搜索的创建时间截止值
+}
+```
+
+**定义响应格式：**
+
+```json
+{
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": [
+        {
+            "id": 1, // ID
+            "name": "分类名称",
+            "createTime": "xxxx-xx-xx xx:xx:xx"
+        }
+    ]
+}
+```
+
+#### 4.1.2、从总响应类中封装派生的分页响应类
+
+在`weblog-module-common`模块下的`utils`包中新建`PageResponse`类继承`Response`，根据所设计的响应模型添加分页请求的成功响应：
+
+```java
+package com.cm.weblog.common.utils;
+
+
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+import java.util.Objects;
+
+/**
+ * 分页响应类
+ */
+@EqualsAndHashCode(callSuper = true)
+@Data
+public class PageResponse<T> extends Response<T> {
+    // 总数
+    private long total = 0L;
+
+    // 每页数据量，默认10
+    private long size = 10L;
+
+    // 当前页码
+    private long current;
+
+    // 总页数
+    private long pages;
+
+    /**
+     * 成功响应
+     * @param page 分页
+     * @param data 响应数据
+     * @return 响应对象
+     * @param <T> 传入的数据类型
+     */
+    public static <T, D> PageResponse<T> success(IPage<D> page, T data) {
+        PageResponse<T> response = new PageResponse<>();
+
+        response.setSuccess(true);
+        response.setCurrent(Objects.isNull(page) ? 1L : page.getCurrent());
+        response.setSize(Objects.isNull(page) ? 10L : page.getSize());
+        response.setTotal(Objects.isNull(page) ? 0L : page.getTotal());
+        response.setPages(Objects.isNull(page) ? 0L : page.getPages());
+        response.setData(data);
+
+        return response;
+    }
+}
+
+```
+
+#### 4.1.3、封装分页请求基础参数类
+
+在`weblog-module-common`模块下新建`model`包，在该包下新建分页请求基础数据类`BasePageQuery`，存放分页请求所需的公共字段：
+
+```java
+package com.cm.weblog.common.model;
+
+import lombok.Data;
+
+/**
+ * 分页请求基础类
+ */
+@Data
+public class BasePageQuery {
+    // 当前页码，默认 1
+    private Long current = 1L;
+
+    // 每页数据量，默认 10
+    private Long size = 10L;
+}
+
+```
+
+#### 4.1.4、配置 MybatisPlus 分页插件
+
+在`weblog-module-common`模块下的`MybatisPlusConfig`配置类中添加分页插件：
+
+```java
+package com.cm.weblog.common.config;
+
+import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+@MapperScan("com.cm.weblog.common.domain.mapper")
+public class MybatisPlusConfig {
+    @Bean
+    public MybatisPlusInterceptor mybatisPlusInterceptor() {
+        MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
+        interceptor.addInnerInterceptor(new PaginationInnerInterceptor());
+        return interceptor;
+    }
+}
+
+```
+
+#### 4.1.5、封装出入参 VO
+
+在`weblog-module-admin`模块的`/model/vo/category`包下新建分页查询分类接口的出人参`VO`
+
+**入参`FindCatgeoryPageListReqVO`：**
+
+```java
+package com.cm.weblog.admin.model.vo.category;
+
+import com.cm.weblog.common.model.BasePageQuery;
+import io.swagger.annotations.ApiModel;
+import lombok.*;
+
+import java.time.LocalDateTime;
+
+/**
+ * 分页查询分类入参实体类
+ */
+@EqualsAndHashCode(callSuper = true)
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+@ApiModel(value = "分页查询分类接口数据人参实体类")
+public class FindCategoryPageListReqVO extends BasePageQuery {
+    // 名称
+    private String name;
+
+    // 创建日期起始值
+    private LocalDateTime startDate;
+
+    // 创建日期截止值
+    private LocalDateTime endDate;
+}
+
+```
+
+**响应`FindCategoryPageListRspVO`：**
+
+```java
+package com.cm.weblog.admin.model.vo.category;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+/**
+ * 分页查询分类响应实体类
+ */
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+public class FindCategoryPageListRspVO {
+    // ID
+    private Long id;
+
+    // 名称
+    private String name;
+
+    // 创建时间
+    private LocalDateTime createTime;
+}
+
+```
+
+#### 4.1.6、在 service 层定义业务方法及实现
+
+在`weblog-module-admin`的`service`包中的`AdminCategoryService`服务中添加分页查询分类的方法：
+
+```java
+/**
+ * 分页查询分类
+ * @param findCategoryPageListReqVO 请求入参
+ * @return 请求响应数据
+*/
+PageResponse<List<FindCategoryPageListRspVO>> findCategoryList(FindCategoryPageListReqVO findCategoryPageListReqVO);
+```
+
+在`impl`包中的`AdminCategoryService`中实现这个方法：
+
+```java
+@Override
+public PageResponse<List<FindCategoryPageListRspVO>> findCategoryList(FindCategoryPageListReqVO findCategoryPageListReqVO) {
+    // 1、获取页码信息
+    Long current = findCategoryPageListReqVO.getCurrent();
+    Long size = findCategoryPageListReqVO.getSize();
+
+    // 2、构建分页对象
+    Page<CategoryDO> page = new Page<>(current, size);
+
+    // 3、构建查询条件
+    LambdaQueryWrapper<CategoryDO> wrapper = new LambdaQueryWrapper<>();
+
+    String name = findCategoryPageListReqVO.getName();
+    LocalDateTime startDate = findCategoryPageListReqVO.getStartDate();
+    LocalDateTime endDate = findCategoryPageListReqVO.getEndDate();
+
+    wrapper
+            .like(StringUtils.isNotBlank(name), CategoryDO::getName, name.trim())
+            .ge(Objects.nonNull(startDate), CategoryDO::getCreateTime, startDate)
+            .le(Objects.nonNull(endDate), CategoryDO::getCreateTime, endDate)
+            .orderByDesc(CategoryDO::getCreateTime);
+
+    // 4、执行分页查询
+    Page<CategoryDO> categoryDOPage = categoryMapper.selectPage(page, wrapper);
+    List<CategoryDO> categoryDOS = categoryDOPage.getRecords();
+
+    // DO 转 VO
+    List<FindCategoryPageListRspVO> vos = null;
+    if (!CollectionUtils.isEmpty(categoryDOS)) {
+        vos = categoryDOS.stream()
+                .map(categoryDO -> FindCategoryPageListRspVO.builder()
+                        .id(categoryDO.getId())
+                        .name(categoryDO.getName())
+                        .createTime(categoryDO.getCreateTime())
+                        .build())
+                .collect(Collectors.toList());
+    } else {
+        return PageResponse.success(categoryDOPage, Collections.emptyList());
+    }
+
+    return PageResponse.success(categoryDOPage, vos);
+}
+```
+
+#### 4.1.7、在 controller 层定义接口
+
+向`AdminCategoryController`中添加分页查询分类的请求：
+
+```java
+@PostMapping("/category/list")
+@ApiOperation(value = "分页查询分类数据")
+@ApiOperationLog(description = "分页查询分类数据")
+public PageResponse<List<FindCategoryPageListRspVO>> findCategoryList(@RequestBody @Validated FindCategoryPageListReqVO findCategoryPageListReqVO) {
+	return adminCategoryService.findCategoryList(findCategoryPageListReqVO);
+}
+```
+
+#### 4.1.8、测试
+
+**无查询条件**
+
+入参：
+
+```java
+{
+    "current": 1,
+    "size": 10,
+    "name": "",
+    "startDate": "",
+    "endDate": ""
+}
+```
+
+响应：
+
+```json
+{
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": [
+        {
+            "id": 1,
+            "name": "Java",
+            "createTime": "2025-10-29 21:27:57"
+        }
+    ],
+    "total": 1,
+    "size": 10,
+    "current": 1,
+    "pages": 1
+}
+```
+
+**超出数据范围**
+
+入参：
+
+```json
+{
+    "current": 2,
+    "size": 10,
+    "name": "",
+    "startDate": "",
+    "endDate": ""
+}
+```
+
+响应：
+
+```json
+{
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": [],
+    "total": 1,
+    "size": 10,
+    "current": 2,
+    "pages": 1
+}
+```
+
+**未查询到数据**
+
+入参：
+
+```json
+{
+    "current": 1,
+    "size": 10,
+    "name": "测试",
+    "startDate": "",
+    "endDate": ""
+}
+```
+
+响应：
+
+```json
+{
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": [],
+    "total": 0,
+    "size": 10,
+    "current": 1,
+    "pages": 0
+}
+```
+

@@ -1,8 +1,11 @@
 package com.cm.weblog.admin.controller;
 
 import com.cm.weblog.admin.model.vo.category.AddCategoryReqVO;
+import com.cm.weblog.admin.model.vo.category.FindCategoryPageListReqVO;
+import com.cm.weblog.admin.model.vo.category.FindCategoryPageListRspVO;
 import com.cm.weblog.admin.service.AdminCategoryService;
 import com.cm.weblog.common.aspect.ApiOperationLog;
+import com.cm.weblog.common.utils.PageResponse;
 import com.cm.weblog.common.utils.Response;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -13,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
+import java.util.List;
 
 @RestController
 @RequestMapping("/admin")
@@ -26,5 +30,12 @@ public class AdminCategoryController {
     @ApiOperationLog(description = "添加分类")
     public Response<?> addCategory(@RequestBody @Validated AddCategoryReqVO addCategoryReqVO) {
         return adminCategoryService.addCategory(addCategoryReqVO);
+    }
+
+    @PostMapping("/category/list")
+    @ApiOperation(value = "分页查询分类数据")
+    @ApiOperationLog(description = "分页查询分类数据")
+    public PageResponse<List<FindCategoryPageListRspVO>> findCategoryList(@RequestBody @Validated FindCategoryPageListReqVO findCategoryPageListReqVO) {
+        return adminCategoryService.findCategoryList(findCategoryPageListReqVO);
     }
 }

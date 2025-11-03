@@ -1,17 +1,26 @@
 package com.cm.weblog.admin.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cm.weblog.admin.model.vo.category.AddCategoryReqVO;
+import com.cm.weblog.admin.model.vo.category.FindCategoryPageListReqVO;
+import com.cm.weblog.admin.model.vo.category.FindCategoryPageListRspVO;
 import com.cm.weblog.admin.service.AdminCategoryService;
 import com.cm.weblog.common.domain.dos.CategoryDO;
 import com.cm.weblog.common.domain.mapper.CategoryMapper;
 import com.cm.weblog.common.enums.ResponseCodeEnum;
 import com.cm.weblog.common.exception.BizException;
+import com.cm.weblog.common.utils.PageResponse;
 import com.cm.weblog.common.utils.Response;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
-import java.util.Objects;
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -37,5 +46,48 @@ public class AdminCategoryServiceImpl implements AdminCategoryService {
         categoryMapper.insert(insertCategoryDO);
 
         return Response.success();
+    }
+
+    @Override
+    public PageResponse<List<FindCategoryPageListRspVO>> findCategoryList(FindCategoryPageListReqVO findCategoryPageListReqVO) {
+        // 1、获取页码信息
+        Long current = findCategoryPageListReqVO.getCurrent();
+        Long size = findCategoryPageListReqVO.getSize();
+
+        // 2、构建分页对象
+        Page<CategoryDO> page = new Page<>(current, size);
+
+        // 3、构建查询条件
+        LambdaQueryWrapper<CategoryDO> wrapper = new LambdaQueryWrapper<>();
+
+        String name = findCategoryPageListReqVO.getName();
+        LocalDateTime startDate = findCategoryPageListReqVO.getStartDate();
+        LocalDateTime endDate = findCategoryPageListReqVO.getEndDate();
+
+        wrapper
+                .like(StringUtils.isNotBlank(name), CategoryDO::getName, name.trim())
+                .ge(Objects.nonNull(startDate), CategoryDO::getCreateTime, startDate)
+                .le(Objects.nonNull(endDate), CategoryDO::getCreateTime, endDate)
+                .orderByDesc(CategoryDO::getCreateTime);
+
+        // 4、执行分页查询
+        Page<CategoryDO> categoryDOPage = categoryMapper.selectPage(page, wrapper);
+        List<CategoryDO> categoryDOS = categoryDOPage.getRecords();
+
+        // DO 转 VO
+        List<FindCategoryPageListRspVO> vos = null;
+        if (!CollectionUtils.isEmpty(categoryDOS)) {
+            vos = categoryDOS.stream()
+                    .map(categoryDO -> FindCategoryPageListRspVO.builder()
+                            .id(categoryDO.getId())
+                            .name(categoryDO.getName())
+                            .createTime(categoryDO.getCreateTime())
+                            .build())
+                    .collect(Collectors.toList());
+        } else {
+            return PageResponse.success(categoryDOPage, Collections.emptyList());
+        }
+
+        return PageResponse.success(categoryDOPage, vos);
     }
 }
