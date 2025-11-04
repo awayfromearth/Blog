@@ -957,3 +957,13 @@ public PageResponse<List<FindCategoryPageListRspVO>> findCategoryList(@RequestBo
 }
 ```
 
+## 4.2、前端分类列表数据渲染
+
+### 4.2.1、封装请求
+
+在`/api/admin/category.js`文件中添加分页查询分类的请求：
+
+```js
+```
+
+### 4.2.2、页面初始化渲染
