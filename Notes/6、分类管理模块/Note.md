@@ -834,7 +834,7 @@ public PageResponse<List<FindCategoryPageListRspVO>> findCategoryList(FindCatego
     List<CategoryDO> categoryDOS = categoryDOPage.getRecords();
 
     // DO 转 VO
-    List<FindCategoryPageListRspVO> vos = null;
+    List<FindCategoryPageListRspVO> vos = Collections.emptyList();
     if (!CollectionUtils.isEmpty(categoryDOS)) {
         vos = categoryDOS.stream()
                 .map(categoryDO -> FindCategoryPageListRspVO.builder()
@@ -843,8 +843,6 @@ public PageResponse<List<FindCategoryPageListRspVO>> findCategoryList(FindCatego
                         .createTime(categoryDO.getCreateTime())
                         .build())
                 .collect(Collectors.toList());
-    } else {
-        return PageResponse.success(categoryDOPage, Collections.emptyList());
     }
 
     return PageResponse.success(categoryDOPage, vos);

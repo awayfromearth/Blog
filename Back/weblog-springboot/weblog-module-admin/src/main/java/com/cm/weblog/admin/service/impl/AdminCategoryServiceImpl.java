@@ -74,18 +74,16 @@ public class AdminCategoryServiceImpl implements AdminCategoryService {
         Page<CategoryDO> categoryDOPage = categoryMapper.selectPage(page, wrapper);
         List<CategoryDO> categoryDOS = categoryDOPage.getRecords();
 
-        // DO 转 VO
-        List<FindCategoryPageListRspVO> vos = null;
+        // 5、DO 转 VO
+        List<FindCategoryPageListRspVO> vos = Collections.emptyList();
         if (!CollectionUtils.isEmpty(categoryDOS)) {
             vos = categoryDOS.stream()
-                    .map(categoryDO -> FindCategoryPageListRspVO.builder()
-                            .id(categoryDO.getId())
-                            .name(categoryDO.getName())
-                            .createTime(categoryDO.getCreateTime())
-                            .build())
-                    .collect(Collectors.toList());
-        } else {
-            return PageResponse.success(categoryDOPage, Collections.emptyList());
+                .map(categoryDO -> FindCategoryPageListRspVO.builder()
+                        .id(categoryDO.getId())
+                        .name(categoryDO.getName())
+                        .createTime(categoryDO.getCreateTime())
+                        .build())
+                .collect(Collectors.toList());
         }
 
         return PageResponse.success(categoryDOPage, vos);
