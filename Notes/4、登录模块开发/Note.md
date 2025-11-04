@@ -2527,7 +2527,7 @@ router.beforeEach((to, from, next) => {
 
 在`main.js`中引入路由守卫：
 ```js
-
+import "@/router/permission"
 ```
 
 ### 12.2、后置路由守卫更改页面标题

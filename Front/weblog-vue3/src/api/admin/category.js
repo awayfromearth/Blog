@@ -8,3 +8,12 @@ import axios from "@/utils/axios"
 export function addCategory(data) {
   return axios.post("/admin/category/add", data)
 }
+
+/**
+ * 分页查询分类接口
+ * @param data 页码、每页数据量、模糊查询的名称、时间范围等参数
+ * @returns {Promise<axios.AxiosResponse<any>>}
+ */
+export function getCategoryPageList(data) {
+  return axios.post("/admin/category/list", data)
+}
