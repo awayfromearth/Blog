@@ -9,6 +9,7 @@ import { ref, reactive, watch } from "vue"
 import { updatePassword } from "@/api/admin/user"
 import { showMessage } from "@/utils/message"
 import { showModel } from "@/utils/model"
+import FormDialog from "@/components/FormDialog.vue"
 
 const menuStore = useMenuStore()
 const userStore = useUserStore()
@@ -19,7 +20,7 @@ function handleRefresh() {
   location.reload()
 }
 
-const dialogVisible = ref(false)
+const formDialogRef = ref(null)
 const formRef = ref(null)
 const form = reactive({
   username: userStore.userInfo.username || '',
@@ -52,7 +53,7 @@ const rules = {
 watch(() => userStore.userInfo.username, v => { form.username = v })
 function handleDropdownCommand(command) {
   if (command === "updatePassword") {
-    dialogVisible.value = true
+    formDialogRef.value.open()
   }
 
   if (command === "logout") {
@@ -64,7 +65,6 @@ function handleDropdownCommand(command) {
   }
 }
 
-const isSubmitButtonLoading = ref(false)
 function onSubmit() {
   formRef.value.validate(async valid => {
     if (valid) {
@@ -72,8 +72,7 @@ function onSubmit() {
         return showMessage("两次密码输入不一致，请检查！", "warning")
       }
 
-      isSubmitButtonLoading.value = true
-
+      formDialogRef.value.switchLoading()
       try {
         const { success, message } = await updatePassword(form)
         if (success) {
@@ -81,7 +80,7 @@ function onSubmit() {
 
           userStore.logout()
 
-          dialogVisible.value = false
+          formDialogRef.value.close()
           router.push('/login')
         } else {
           showMessage(message, "error")
@@ -89,7 +88,7 @@ function onSubmit() {
       } catch(e) {
         console.log(e)
       } finally {
-        isSubmitButtonLoading.value = false
+        formDialogRef.value.switchLoading()
       }
     }
   })
@@ -147,31 +146,21 @@ function onSubmit() {
       </el-dropdown>
     </div>
   </div>
-  <!-- 修改密码 -->
-  <el-dialog v-model="dialogVisible" title="修改密码" width="40%" :draggable ="true" :close-on-click-modal="false" :close-on-press-escape="false">
+
+  <FormDialog ref="formDialogRef" title="修改密码" width="40%" @submit="onSubmit">
     <el-form ref="formRef" :rules="rules" :model="form">
       <el-form-item label="用户名" prop="username" label-width="120px">
         <!-- 输入框组件 -->
         <el-input size="large" v-model="form.username" placeholder="请输入用户名" clearable disabled />
       </el-form-item>
       <el-form-item label="密码" prop="password" label-width="120px">
-        <el-input size="large" type="password" v-model="form.password" placeholder="请输入密码"
-                  clearable show-password />
+        <el-input size="large" type="password" v-model="form.password" placeholder="请输入密码" clearable show-password />
       </el-form-item>
       <el-form-item label="确认密码" prop="rePassword" label-width="120px">
-        <el-input size="large" type="password" v-model="form.rePassword" placeholder="请确认密码"
-                  clearable show-password />
+        <el-input size="large" type="password" v-model="form.rePassword" placeholder="请确认密码" clearable show-password />
       </el-form-item>
     </el-form>
-    <template #footer>
-      <span class="dialog-footer">
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="onSubmit" :loading="isSubmitButtonLoading">
-          提交
-        </el-button>
-      </span>
-    </template>
-  </el-dialog>
+  </FormDialog>
 </template>
 
 <style scoped>

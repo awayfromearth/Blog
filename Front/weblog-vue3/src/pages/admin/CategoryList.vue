@@ -4,18 +4,23 @@ import {
   ref,
   reactive
 } from "vue"
-import { addCategory, getCategoryPageList } from "@/api/admin/category"
+import { addCategory, getCategoryPageList, deleteCategory } from "@/api/admin/category"
 import { showMessage } from "@/utils/message"
+import { showModel } from "@/utils/model"
 
+import FormDialog from "@/components/FormDialog.vue"
 import moment from "moment"
-
-const dialogVisible = ref(false)
 
 const form = reactive({
   name: ""
 })
 
+const formDialogRef = ref(null)
 const formRef = ref(null)
+
+function openDialog() {
+  formDialogRef.value.open()
+}
 
 const rules = {
   name: [
@@ -36,16 +41,23 @@ const rules = {
 function onSubmit() {
   formRef.value.validate(async (valid) => {
     if (valid) {
-      const { success, message } = await addCategory(form)
-      if (success) {
-        showMessage("添加成功")
-        dialogVisible.value = false
-        form.name = ""
+      formDialogRef.value.switchLoading()
+      try {
+        const { success, message } = await addCategory(form)
+        if (success) {
+          showMessage("添加成功")
+          formDialogRef.value.close()
+          form.name = ""
 
-        // 渲染表格数据
-        await getTableData()
-      } else {
-        showMessage(message, "error")
+          // 渲染表格数据
+          await getTableData()
+        } else {
+          showMessage(message, "error")
+        }
+      } catch(e) {
+        console.log(e)
+      } finally {
+        formDialogRef.value.switchLoading()
       }
     }
   })
@@ -90,8 +102,8 @@ const tableData = ref([])
 const isTableLoading = ref(false)
 
 async function getTableData(p = current.value) {
-  console.log(p)
   current.value = p
+  isTableLoading.value = true
   try {
     let startDate = ""
     let endDate = ""
@@ -114,6 +126,8 @@ async function getTableData(p = current.value) {
     }
   } catch(e) {
     console.log(e)
+  } finally {
+    isTableLoading.value = false
   }
 }
 
@@ -127,6 +141,24 @@ function handleSizeChange(chosenSize) {
 function resetQueryParams() {
   searchCategoryName.value = ""
   pickedDate.value = null
+}
+
+function showDeleteCategoryConfirmModal(r) {
+  showModel('是否确定要删除该分类？').then(async () => {
+    try {
+      const { success, message } = await deleteCategory(r.id)
+      if (success) {
+        showMessage('删除成功')
+        getTableData()
+      } else {
+        showMessage(message, "error")
+      }
+    } catch(e) {
+      console.log(e)
+    }
+  }).catch(() => {
+    console.log('取消了')
+  })
 }
 </script>
 
@@ -153,11 +185,12 @@ function resetQueryParams() {
     <el-card shadow="never">
       <!-- 新增按钮 -->
       <div class="mb-5">
-        <el-button type="primary" @click="dialogVisible = true">
+        <el-button type="primary" @click="openDialog">
           <el-icon class="mr-1">
             <Plus />
           </el-icon>
-          新增</el-button>
+          新增
+        </el-button>
       </div>
 
       <!-- 分页列表 -->
@@ -166,7 +199,7 @@ function resetQueryParams() {
         <el-table-column prop="createTime" label="创建时间" width="180" />
         <el-table-column label="操作" >
           <template #default="scope">
-            <el-button type="danger" size="small">
+            <el-button type="danger" size="small" @click="showDeleteCategoryConfirmModal(scope.row)">
               <el-icon class="mr-1">
                 <Delete />
               </el-icon>
@@ -192,22 +225,13 @@ function resetQueryParams() {
 
     </el-card>
 
-    <el-dialog v-model="dialogVisible" title="添加文章分类" width="40%" :draggable ="true" :close-on-click-modal="false" :close-on-press-escape="false">
+    <FormDialog ref="formDialogRef" title="添加文章分类" width="40%" @submit="onSubmit">
       <el-form ref="formRef" :rules="rules" :model="form">
         <el-form-item label="分类名称" prop="name" label-width="80px" class="align-middle">
           <!-- 输入框组件 -->
           <el-input size="large" v-model="form.name" placeholder="请输入分类名称" maxlength="10" show-word-limit clearable/>
         </el-form-item>
       </el-form>
-
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="onSubmit">
-            提交
-          </el-button>
-        </span>
-      </template>
-    </el-dialog>
+    </FormDialog>
   </div>
 </template>

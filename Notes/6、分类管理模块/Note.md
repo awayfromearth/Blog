@@ -1202,3 +1202,537 @@ function resetQueryParams() {
 </template>
 ```
 
+## 五、删除分类功能
+
+### 5.1、接口开发
+
+#### 5.1.1、设计接口模型
+
+- 接口地址：`/admin/category/delete`
+- 接口方法：`DELETE`
+- 入参：`/admin/category/delete?id={要删除的分类的id}`
+- 响应：
+  ```json
+  {
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": null
+  }
+  ```
+
+#### 5.1.2、在业务层定义方法及实现
+
+首先向`weblog-module-admin`中的`AdminCategoryService`中添加删除分类的方法定义：
+
+```java
+/**
+ * 删除分类
+ * @param id 分类id
+ * @return 响应
+ */
+Response<?> deleteCategory(Long id);
+```
+
+然后在实现类中实现这个方法，调用分类的`mapper`删除对应`id`的分类：
+
+```java
+@Override
+public Response<?> deleteCategory(Long id) {
+    categoryMapper.deleteById(id);
+    return Response.success();
+}
+```
+
+#### 5.1.3、在控制层添加接口
+
+向`AdminCategoryController`控制器中添加删除分类的接口：
+
+```java
+@DeleteMapping("/category/delete")
+@ApiOperation(value = "删除分类")
+@ApiOperationLog(description = "删除分类")
+public Response<?> findCategoryPageList(@RequestParam Long id) {
+    return adminCategoryService.deleteCategory(id);
+}
+```
+
+#### 5.1.4、测试
+
+重启项目，发送请求，查看效果
+
+请求：`admin/category/delete?id=11`
+
+返回：
+
+```json
+{
+  "success": true,
+  "message": null,
+  "code": null,
+  "data": null
+}
+```
+
+数据库中`id`为`11`的数据成功被删除。
+
+### 5.2、前端开发
+
+#### 5.2.1、封装请求
+
+向`/api/admin/category.js`文件中添加删除分类的请求：
+
+```js
+/**
+ * 删除分类接口
+ * @param id 分类 id
+ * @returns {Promise<axios.AxiosResponse<any>>}
+ */
+export function deleteCategory(id) {
+  return axiso({
+    url: "/admin/category/delete",
+    method: "DELETE",
+    params: {
+      id
+    }
+  })
+}
+```
+
+#### 5.2.2、为删除按钮绑定点击事件
+
+点击删除按钮后首先弹出确认框，点击确认后再发送删除分类的请求，删除成功后再次调用接口渲染新的表格数据：
+
+```vue
+<script setup>
+// ...省略
+import { showModel } from "@/utils/model"
+
+function showDeleteCategoryConfirmModal(r) {
+  showModel('是否确定要删除该分类？').then(async () => {
+    try {
+      const { success, message } = await deleteCategory(r.id)
+      if (success) {
+        showMessage('删除成功')
+        getTableData()
+      } else {
+        showMessage(message, "error")
+      }
+    } catch(e) {
+      console.log(e)
+    }
+  }).catch(() => {
+    console.log('取消了')
+  })
+}
+</script>
+
+<template>
+  <!-- 省略 -->
+  <el-button type="danger" size="small" @click="showDeleteCategoryConfirmModal(scope.row)">
+    <el-icon class="mr-1">
+      <Delete />
+    </el-icon>
+    删除
+  </el-button>
+</template>
+```
+
+## 六、前端优化
+
+### 6.1、封装通用表单模态框组件
+
+#### 6.1.1、封装组件
+
+用户退出登录和新增分类等地方多次弹出对话框内置表单项，将公共部分抽象出来封装成一个模态框组件
+
+在`src`目录下新建`components`目录，统一存放自定义组件，在其中新建`FormDialog.vue`：
+
+```vue
+<script setup>
+import { ref } from "vue"
+
+defineProps({
+  title: String,
+  width: {
+    type: String,
+    default: "40%"
+  },
+  destroyOnClose: {
+    type: Boolean,
+    default: false
+  },
+  confirmText: {
+    type: String,
+    default: "提交"
+  }
+})
+
+const dialogVisible = ref(false)
+
+function open() {
+  dialogVisible.value = true
+}
+
+function close() {
+  dialogVisible.value = false
+}
+
+defineExpose({
+  open,
+  close
+})
+
+const emit = defineEmits(["submit"])
+
+function submit() {
+  emit("submit")
+}
+</script>
+
+<template>
+  <el-dialog
+      v-model="dialogVisible"
+      :title="title"
+      :width="width"
+      :destroy-on-close="destroyOnClose"
+  >
+    <!-- 插槽 -->
+    <slot></slot>
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submit">
+          提交
+        </el-button>
+      </span>
+    </template>
+  </el-dialog>
+</template>
+```
+
+#### 6.1.2、分类列表页替换为自定义表单模态框组件
+
+删除`CategoryList.vue`中原先使用的模态框代码，使用自定义的组件，整理代码，删除多余变量：
+
+```vue
+<script setup>
+// ... 省略
+import FormDialog from "@/components/FormDialog.vue"
+
+const formDialogRef = ref(null)
+
+function openDialog() {
+  formDialogRef.value.open()
+}
+
+function onSubmit() {
+  formRef.value.validate(async (valid) => {
+    if (valid) {
+      const { success, message } = await addCategory(form)
+      if (success) {
+        showMessage("添加成功")
+        formDialogRef.value.close()
+        form.name = ""
+
+        // 渲染表格数据
+        await getTableData()
+      } else {
+        showMessage(message, "error")
+      }
+    }
+  })
+}
+</script>
+
+<template>
+  <!-- 省略 -->
+
+  <!-- 新增按钮 -->
+  <div class="mb-5">
+    <el-button type="primary" @click="openDialog">
+      <el-icon class="mr-1">
+        <Plus />
+      </el-icon>
+      新增
+    </el-button>
+  </div>
+
+  <FormDialog ref="formDialogRef" title="添加文章分类" width="40%" @submit="onSubmit">
+    <el-form ref="formRef" :rules="rules" :model="form">
+      <el-form-item label="分类名称" prop="name" label-width="80px" class="align-middle">
+        <!-- 输入框组件 -->
+        <el-input size="large" v-model="form.name" placeholder="请输入分类名称" maxlength="10" show-word-limit clearable/>
+      </el-form-item>
+    </el-form>
+  </FormDialog>
+</template>
+```
+
+#### 6.1.3、用户修改密码替换为自定义表单模态框组件
+
+修改`AdminHeader.vue`，最终代码如下：
+
+```vue
+<script setup>
+import AvatarImg from "@/assets/images/avatar.jpg"
+
+import { useMenuStore } from "@/stores/menu"
+import { useUserStore } from "@/stores/user.js"
+import { useRouter } from "vue-router"
+import { useFullscreen } from "@vueuse/core"
+import { ref, reactive, watch } from "vue"
+import { updatePassword } from "@/api/admin/user"
+import { showMessage } from "@/utils/message"
+import { showModel } from "@/utils/model"
+import FormDialog from "@/components/FormDialog.vue"
+
+const menuStore = useMenuStore()
+const userStore = useUserStore()
+const router = useRouter()
+const { isFullscreen, toggle } = useFullscreen()
+
+function handleRefresh() {
+  location.reload()
+}
+
+const formDialogRef = ref(null)
+const formRef = ref(null)
+const form = reactive({
+  username: userStore.userInfo.username || '',
+  password: '',
+  rePassword: ''
+})
+const rules = {
+  username: [
+    {
+      required: true,
+      message: '用户名不能为空',
+      trigger: 'blur'
+    }
+  ],
+  password: [
+    {
+      required: true,
+      message: '密码不能为空',
+      trigger: 'blur',
+    },
+  ],
+  rePassword: [
+    {
+      required: true,
+      message: '确认密码不能为空',
+      trigger: 'blur',
+    },
+  ]
+}
+watch(() => userStore.userInfo.username, v => { form.username = v })
+function handleDropdownCommand(command) {
+  if (command === "updatePassword") {
+    formDialogRef.value.open()
+  }
+
+  if (command === "logout") {
+    showModel("是否确认要退出登录？").then(() => {
+      userStore.logout()
+      showMessage("退出登录成功！")
+      router.push("/login")
+    })
+  }
+}
+
+function onSubmit() {
+  formRef.value.validate(async valid => {
+    if (valid) {
+      if (form.password !== form.rePassword) {
+        return showMessage("两次密码输入不一致，请检查！", "warning")
+      }
+
+      try {
+        const { success, message } = await updatePassword(form)
+        if (success) {
+          showMessage("密码重置成功，请重新登录！")
+
+          userStore.logout()
+
+          formDialogRef.value.close()
+          router.push('/login')
+        } else {
+          showMessage(message, "error")
+        }
+      } catch(e) {
+        console.log(e)
+      } finally {
+      }
+    }
+  })
+}
+</script>
+
+<template>
+  <!-- 通过 flex 指定水平布局 -->
+  <!-- 设置背景色为白色、高度为 64px，padding-right 为 4， border-bottom 为 slate 200 -->
+  <div class="bg-white h-[64px] flex pr-4 border-b border-slate-100">
+    <!-- 左边栏收缩、展开 -->
+    <div class="w-[42px] h-[64px] cursor-pointer flex items-center justify-center text-gray-700 hover:bg-gray-200" @click="menuStore.toggleMenuCollapsed">
+      <el-icon>
+        <Fold v-if="!menuStore.isMenuCollapsed" />
+        <Expand v-else />
+      </el-icon>
+    </div>
+
+    <!-- 右边容器，通过 ml-auto 让其在父容器的右边 -->
+    <div class="ml-auto flex">
+      <!-- 点击刷新页面 -->
+      <el-tooltip class="box-item" effect="dark" content="刷新" placement="bottom">
+        <div class="w-[42px] h-[64px] cursor-pointer flex items-center justify-center text-gray-700 hover:bg-gray-200" @click="handleRefresh">
+          <el-icon>
+            <Refresh />
+          </el-icon>
+        </div>
+      </el-tooltip>
+      <!-- 点击全屏展示 -->
+      <el-tooltip class="box-item" effect="dark" :content="isFullscreen ? '取消全屏' : '全屏'" placement="bottom">
+        <div class="w-[42px] h-[64px] cursor-pointer flex items-center justify-center text-gray-700 mr-2 hover:bg-gray-200" @click="toggle">
+          <el-icon>
+            <FullScreen v-if="!isFullscreen"/>
+            <Aim v-else/>
+          </el-icon>
+        </div>
+      </el-tooltip>
+
+      <!-- 登录用户头像 -->
+      <el-dropdown trigger="click" class="flex items-center justify-center" @command="handleDropdownCommand">
+        <span class="el-dropdown-link flex items-center justify-center text-gray-700 text-xs">
+          <!-- 头像 Avatar -->
+          <el-avatar class="mr-2" :size="25" :src="AvatarImg" />
+          {{ userStore.userInfo.username }}
+          <el-icon class="el-icon--right">
+            <arrow-down />
+          </el-icon>
+        </span>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="updatePassword">修改密码</el-dropdown-item>
+            <el-dropdown-item command="logout">退出登录</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </div>
+  </div>
+
+  <FormDialog ref="formDialogRef" title="修改密码" width="40%" @submit="onSubmit">
+    <el-form ref="formRef" :rules="rules" :model="form">
+      <el-form-item label="用户名" prop="username" label-width="120px">
+        <!-- 输入框组件 -->
+        <el-input size="large" v-model="form.username" placeholder="请输入用户名" clearable disabled />
+      </el-form-item>
+      <el-form-item label="密码" prop="password" label-width="120px">
+        <el-input size="large" type="password" v-model="form.password" placeholder="请输入密码" clearable show-password />
+      </el-form-item>
+      <el-form-item label="确认密码" prop="rePassword" label-width="120px">
+        <el-input size="large" type="password" v-model="form.rePassword" placeholder="请确认密码" clearable show-password />
+      </el-form-item>
+    </el-form>
+  </FormDialog>
+</template>
+
+<style scoped>
+.el-dropdown-link {
+  outline: none;
+}
+:deep(.el-input.is-disabled .el-input__inner) {
+  background-color: transparent;
+}
+</style>
+
+```
+
+### 6.2、等待请求完成时加载中状态
+
+修改`CategoryList.vue`，为`table`组件绑定加载中切换的状态，当请求开始时展示加载动画，请求结束后结束动画：
+
+```vue
+<script setup>
+// ... 省略
+const isTableLoading = ref(false)
+
+async function getTableData(p = current.value) {
+  current.value = p
+  isTableLoading.value = true
+  try {
+    let startDate = ""
+    let endDate = ""
+    if (pickedDate.value) {
+      startDate = moment(pickedDate.value[0]).format("YYYY-MM-DD HH:mm:ss")
+      endDate = moment(pickedDate.value[1]).format("YYYY-MM-DD HH:mm:ss")
+    }
+    const { data, current: currentPage, success, size: pageSize, total: totalCount } = await getCategoryPageList({
+      current: current.value,
+      size: size.value,
+      name: searchCategoryName.value,
+      startDate,
+      endDate,
+    })
+    if (success) {
+      tableData.value = data
+      current.value = currentPage
+      size.value = pageSize
+      total.value = totalCount
+    }
+  } catch(e) {
+    console.log(e)
+  } finally {
+    isTableLoading.value = false
+  }
+}
+</script>
+
+<template>
+  <!-- 省略 -->
+  <el-table v-loading="isTableLoading" :data="tableData" border stripe style="width: 100%"></el-table>
+</template>
+```
+
+修改`FormDialog`组件，暴露切换加载状态的方法：
+
+```vue
+<script setup>
+// ... 省略
+const isLoading = ref(false)
+
+function switchLoading() {
+  isLoading.value = !isLoading.value
+}
+
+defineExpose({
+  switchLoading
+})
+</script>
+
+<template>
+  <!-- 省略 -->
+  <el-button type="primary" @click="submit" :loading="isLoading">
+    提交
+  </el-button>
+</template>
+```
+
+修改使用该组件的页面，在提交表单时以及表单切换时切换加载状态：
+
+```js
+function onSubmit() {
+  formRef.value.validate(async (valid) => {
+    if (valid) {
+      formDialogRef.value.switchLoading()
+      try {
+        // ...执行过程略
+      } catch(e) {
+        console.log(e)
+      } finally {
+        formDialogRef.value.switchLoading()
+      }
+    }
+  })
+}
+```

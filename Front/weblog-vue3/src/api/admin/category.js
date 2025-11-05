@@ -17,3 +17,18 @@ export function addCategory(data) {
 export function getCategoryPageList(data) {
   return axios.post("/admin/category/list", data)
 }
+
+/**
+ * 删除分类接口
+ * @param id 分类 id
+ * @returns {Promise<axios.AxiosResponse<any>>}
+ */
+export function deleteCategory(id) {
+  return axios({
+    url: "/admin/category/delete",
+    method: "DELETE",
+    params: {
+      id
+    }
+  })
+}
