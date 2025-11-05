@@ -22,4 +22,11 @@ public interface AdminCategoryService {
      * @return 请求响应数据
      */
     PageResponse<List<FindCategoryPageListRspVO>> findCategoryList(FindCategoryPageListReqVO findCategoryPageListReqVO);
+
+    /**
+     * 删除分类
+     * @param id 分类id
+     * @return 请求响应数据
+     */
+    Response<?> deleteCategory(Long id);
 }

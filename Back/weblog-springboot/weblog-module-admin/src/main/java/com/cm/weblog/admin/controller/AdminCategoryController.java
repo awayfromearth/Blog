@@ -10,10 +10,7 @@ import com.cm.weblog.common.utils.Response;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import java.util.List;
@@ -37,5 +34,12 @@ public class AdminCategoryController {
     @ApiOperationLog(description = "分页查询分类数据")
     public PageResponse<List<FindCategoryPageListRspVO>> findCategoryList(@RequestBody @Validated FindCategoryPageListReqVO findCategoryPageListReqVO) {
         return adminCategoryService.findCategoryList(findCategoryPageListReqVO);
+    }
+
+    @DeleteMapping("/category/delete")
+    @ApiOperation(value = "删除分类")
+    @ApiOperationLog(description = "删除分类")
+    public Response<?> deleteCategory(@RequestParam Long id) {
+        return adminCategoryService.deleteCategory(id);
     }
 }

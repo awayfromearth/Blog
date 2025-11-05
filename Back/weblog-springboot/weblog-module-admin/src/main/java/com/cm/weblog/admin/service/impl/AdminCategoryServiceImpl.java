@@ -88,4 +88,11 @@ public class AdminCategoryServiceImpl implements AdminCategoryService {
 
         return PageResponse.success(categoryDOPage, vos);
     }
+
+    @Override
+    public Response<?> deleteCategory(Long id) {
+        categoryMapper.deleteById(id);
+
+        return Response.success();
+    }
 }
