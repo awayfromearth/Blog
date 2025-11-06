@@ -50,33 +50,37 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
         // 从请求头获取 key 为 Authorization 的值
         String header = request.getHeader(tokenHeaderKey);
 
-        // 判断是否以 Bearer 开头
-        if (StringUtils.startsWith(header, tokenPrefix)) {
-            // 截取 Token
-            String token = StringUtils.substring(header, 7);
-            log.info("token: {}", token);
+        // 仅校验 admin 开头的请求
+        String requestURI = request.getRequestURI();
+        if (requestURI.startsWith("/admin")) {
+            // 判断是否以 Bearer 开头
+            if (StringUtils.startsWith(header, tokenPrefix)) {
+                // 截取 Token
+                String token = StringUtils.substring(header, 7);
+                log.info("token: {}", token);
 
-            // 判空
-            if (StringUtils.isNotBlank(token)) {
-                try {
-                    jwtTokenHelper.validateToken(token);
-                } catch (MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
-                    authenticationEntryPoint.commence(request, response, new AuthenticationServiceException("Token 不可用"));
-                    return;
-                } catch (ExpiredJwtException e) {
-                    authenticationEntryPoint.commence(request, response, new AuthenticationServiceException("Token 已失效"));
-                    return;
-                }
+                // 判空
+                if (StringUtils.isNotBlank(token)) {
+                    try {
+                        jwtTokenHelper.validateToken(token);
+                    } catch (MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
+                        authenticationEntryPoint.commence(request, response, new AuthenticationServiceException("Token 不可用"));
+                        return;
+                    } catch (ExpiredJwtException e) {
+                        authenticationEntryPoint.commence(request, response, new AuthenticationServiceException("Token 已失效"));
+                        return;
+                    }
 
-                String username = jwtTokenHelper.getUsernameFromToken(token);
+                    String username = jwtTokenHelper.getUsernameFromToken(token);
 
-                if (StringUtils.isNotBlank(username) && Objects.isNull(SecurityContextHolder.getContext().getAuthentication())) {
-                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                    if (StringUtils.isNotBlank(username) && Objects.isNull(SecurityContextHolder.getContext().getAuthentication())) {
+                        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    }
                 }
             }
         }

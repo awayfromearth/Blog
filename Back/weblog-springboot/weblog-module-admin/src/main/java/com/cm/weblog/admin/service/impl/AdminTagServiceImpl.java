@@ -1,0 +1,48 @@
+package com.cm.weblog.admin.service.impl;
+
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.cm.weblog.admin.model.vo.tag.AddTagReqVO;
+import com.cm.weblog.admin.service.AdminTagService;
+import com.cm.weblog.common.domain.dos.TagDO;
+import com.cm.weblog.common.domain.mapper.TagMapper;
+import com.cm.weblog.common.utils.Response;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import javax.annotation.Resource;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * 标签服务实现类
+ */
+@Service
+@Slf4j
+public class AdminTagServiceImpl extends ServiceImpl<TagMapper, TagDO> implements AdminTagService {
+    @Resource
+    private TagMapper tagMapper;
+
+    @Override
+    @Transactional
+    public Response<?> addTags(AddTagReqVO addTagReqVO) {
+        // 1、VO 转 DO
+        List<TagDO> tagDOs = addTagReqVO.getTags()
+                .stream().map(tagName -> TagDO.builder()
+                        .name(tagName.trim())
+                        .createTime(LocalDateTime.now())
+                        .updateTime(LocalDateTime.now())
+                        .build())
+                .collect(Collectors.toList());
+
+        // 2、批量插入数据
+        try {
+            saveBatch(tagDOs);
+        } catch (Exception e) {
+            log.warn("该标签已存在", e);
+        }
+
+        return Response.success();
+    }
+}
