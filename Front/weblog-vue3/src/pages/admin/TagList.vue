@@ -4,9 +4,10 @@ import {
   ref,
   reactive
 } from "vue"
-// import { addTag, getTagPageList, deleteTag } from "@/api/admin/tag"
+import { addTags } from "@/api/admin/tag"
 import { showMessage } from "@/utils/message"
 import { showModel } from "@/utils/model"
+import { nanoid } from "nanoid"
 
 import FormDialog from "@/components/FormDialog.vue"
 import moment from "moment"
@@ -16,51 +17,37 @@ const form = reactive({
 })
 
 const formDialogRef = ref(null)
-const formRef = ref(null)
+
+const inputtedTags = ref([])
 
 function openDialog() {
   formDialogRef.value.open()
 }
 
-const rules = {
-  name: [
-    {
-      required: true,
-      message: "标签名称不能为空",
-      trigger: "blur"
-    },
-    {
-      min: 1,
-      max: 10,
-      message: "标签名称字数要求大于 1 个字符，小于 10 个字符",
-      trigger: "blur"
-    }
-  ]
-}
-
-function onSubmit() {
-  formRef.value.validate(async (valid) => {
-    if (valid) {
-      formDialogRef.value.switchLoading()
-      try {
-        const { success, message } = await addTag(form)
-        if (success) {
-          showMessage("添加成功")
-          formDialogRef.value.close()
-          form.name = ""
-
-          // 渲染表格数据
-          await getTableData()
-        } else {
-          showMessage(message, "error")
-        }
-      } catch(e) {
-        console.log(e)
-      } finally {
-        formDialogRef.value.switchLoading()
+async function onSubmit() {
+  if (inputtedTags.value.length === 0) {
+    formDialogRef.value.close()
+  } else {
+    formDialogRef.value.switchLoading()
+    const tags = inputtedTags.value.map(i => i.name)
+    try {
+      const { success, message } = await addTags({ tags })
+      if (success) {
+        showMessage("添加成功")
+        formDialogRef.value.close()
+        form.name = ""
+        // 渲染表格数据，暂未封装
+      } else {
+        showMessage(message, "error")
       }
+      formDialogRef.value.switchLoading()
+      formDialogRef.value.close()
+      inputtedTags.value = []
+    } catch(e) {
+      console.log(e)
+      formDialogRef.value.switchLoading()
     }
-  })
+  }
 }
 
 const shortcuts = [
@@ -100,6 +87,8 @@ const total = ref(0)
 const size = ref(10)
 const tableData = ref([])
 const isTableLoading = ref(false)
+
+const isInputShow = ref(false)
 
 async function getTableData(p = current.value) {
   current.value = p
@@ -159,6 +148,23 @@ function showDeleteCategoryConfirmModal(r) {
   }).catch(() => {
     console.log('取消了')
   })
+}
+
+function addTag() {
+  const value = form.name.trim()
+  if (value) {
+    inputtedTags.value.push({
+      id: nanoid(),
+      name: value
+    })
+  }
+  isInputShow.value = false
+
+  form.name = ""
+}
+
+function removeTag(i) {
+  inputtedTags.value.splice(i, 1)
 }
 </script>
 
@@ -226,10 +232,17 @@ function showDeleteCategoryConfirmModal(r) {
     </el-card>
 
     <FormDialog ref="formDialogRef" title="添加文章标签" width="40%" @submit="onSubmit">
-      <el-form ref="formRef" :rules="rules" :model="form">
-        <el-form-item label="标签名称" prop="name" label-width="80px" class="align-middle">
-          <!-- 输入框组件 -->
-          <el-input size="large" v-model="form.name" placeholder="请输入标签名称" maxlength="10" show-word-limit clearable/>
+      <el-form>
+        <el-form-item class="align-middle">
+          <el-tag v-for="(t, i) in inputtedTags" :key="t.id" class="mx-1" closable :disable-transitions="false" @close="removeTag(i)">
+            {{ t.name }}
+          </el-tag>
+          <span class="w-20">
+            <el-input v-if="isInputShow" class="ml-1 w-20" size="small" v-model="form.name" @keyup.enter="addTag" />
+            <el-button v-else class="button-new-tag ml-1" size="small" @click="isInputShow = true">
+              + 新增标签
+            </el-button>
+          </span>
         </el-form-item>
       </el-form>
     </FormDialog>

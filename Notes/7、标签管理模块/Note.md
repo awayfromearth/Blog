@@ -556,3 +556,278 @@ public class AdminTagController {
 ```
 
 数据库中也成功插入数据，测试成功！
+
+### 3.2、新增标签前端开发
+
+#### 3.2.1、在标签页替换自定义模态框组件插槽
+
+目标效果如下：
+
+![](images/1.png)
+
+在`TagList.vue`文件中修改`FormDialog`组件的插槽内容，插槽替换为如下内容：
+
+```vue
+<el-form>
+	<el-form-item class="align-middle">
+		<el-tag class="mx-1" clo<el-form>
+        <el-form-item class="align-middle">
+          <el-tag class="mx-1" closable :disable-transitions="false">
+            标签1
+          </el-tag>
+          <span class="w-20">
+            <el-input class="ml-1 w-20" size="small" />
+            <el-button class="button-new-tag ml-1" size="small">
+              + 新增标签
+            </el-button>
+          </span>
+        </el-form-item>
+      </el-form>sable :disable-transitions="false">
+			标签1
+		</el-tag>
+		<el-input class="ml-1 w-20" size="small" />
+		<el-button class="button-new-tag ml-1" size="small">
+			+ 新增标签
+		</el-button>
+	</el-form-item>
+</el-form>
+```
+
+在`script`中绑定相关变量与方法完善业务：
+
+- 去除标签名称校验
+- 点击新增标签按钮时输入框显示，按钮隐藏
+- 输入框回车时添加标签
+- 点击提交时发送请求
+
+最终`script`中代码如下：
+
+```js
+import { Search, RefreshRight } from "@element-plus/icons-vue"
+import {
+  ref,
+  reactive
+} from "vue"
+// import { addTag, getTagPageList, deleteTag } from "@/api/admin/tag"
+import { showMessage } from "@/utils/message"
+import { showModel } from "@/utils/model"
+import { nanoid } from "nanoid"
+
+import FormDialog from "@/components/FormDialog.vue"
+import moment from "moment"
+
+const form = reactive({
+  name: ""
+})
+
+const formDialogRef = ref(null)
+
+const inputtedTags = ref([])
+
+function openDialog() {
+  formDialogRef.value.open()
+}
+
+function onSubmit() {
+  if (inputtedTags.value.length === 0) {
+    formDialogRef.value.close()
+  } else {
+    formDialogRef.value.switchLoading()
+    const tags = inputtedTags.value.map(i => i.name)
+    console.log(tags)
+    try {
+      // 发送请求，暂未封装
+      formDialogRef.value.switchLoading()
+      formDialogRef.value.close()
+    } catch(e) {
+      console.log(e)
+      formDialogRef.value.switchLoading()
+    }
+  }
+}
+
+const shortcuts = [
+  {
+    text: "最近一周",
+    value: () => {
+      const end = new Date()
+      const start = new Date()
+      start.setTime(start.getTime() - 3600 * 1000 * 24 * 7)
+      return [start, end]
+    },
+  },
+  {
+    text: '最近一个月',
+    value: () => {
+      const end = new Date()
+      const start = new Date()
+      start.setTime(start.getTime() - 3600 * 1000 * 24 * 30)
+      return [start, end]
+    },
+  },
+  {
+    text: '最近三个月',
+    value: () => {
+      const end = new Date()
+      const start = new Date()
+      start.setTime(start.getTime() - 3600 * 1000 * 24 * 90)
+      return [start, end]
+    },
+  }
+]
+
+const pickedDate = ref(null)
+const searchTagName = ref("")
+const current = ref(1)
+const total = ref(0)
+const size = ref(10)
+const tableData = ref([])
+const isTableLoading = ref(false)
+
+const isInputShow = ref(false)
+
+async function getTableData(p = current.value) {
+  current.value = p
+  isTableLoading.value = true
+  try {
+    // let startDate = ""
+    // let endDate = ""
+    // if (pickedDate.value) {
+    //   startDate = moment(pickedDate.value[0]).format("YYYY-MM-DD HH:mm:ss")
+    //   endDate = moment(pickedDate.value[1]).format("YYYY-MM-DD HH:mm:ss")
+    // }
+    // const { data, current: currentPage, success, size: pageSize, total: totalCount } = await getTagPageList({
+    //   current: current.value,
+    //   size: size.value,
+    //   name: searchTagName.value,
+    //   startDate,
+    //   endDate,
+    // })
+    // if (success) {
+    //   tableData.value = data
+    //   current.value = currentPage
+    //   size.value = pageSize
+    //   total.value = totalCount
+    // }
+  } catch(e) {
+    console.log(e)
+  } finally {
+    isTableLoading.value = false
+  }
+}
+
+getTableData()
+
+function handleSizeChange(chosenSize) {
+  size.value = chosenSize
+  getTableData(1)
+}
+
+function resetQueryParams() {
+  searchTagName.value = ""
+  pickedDate.value = null
+}
+
+function showDeleteCategoryConfirmModal(r) {
+  showModel('是否确定要删除该标签？').then(async () => {
+    try {
+      // const { success, message } = await deleteTag(r.id)
+      // if (success) {
+      //   showMessage('删除成功')
+      //   getTableData()
+      // } else {
+      //   showMessage(message, "error")
+      // }
+    } catch(e) {
+      console.log(e)
+    }
+  }).catch(() => {
+    console.log('取消了')
+  })
+}
+
+function addTag() {
+  const value = form.name.trim()
+  if (value) {
+    inputtedTags.value.push({
+      id: nanoid(),
+      name: value
+    })
+  }
+  isInputShow.value = false
+
+  form.name = ""
+}
+
+function removeTag(i) {
+  inputtedTags.value.splice(i, 1)
+}
+```
+
+在模板中绑定变量如下：
+
+```vue
+<el-form>
+	<el-form-item class="align-middle">
+		<el-tag v-for="(t, i) in inputtedTags" :key="t.id" class="mx-1" closable :disable-transitions="false" @close="removeTag(i)">
+			{{ t.name }}
+		</el-tag>
+		<span class="w-20">
+			<el-input v-if="isInputShow" class="ml-1 w-20" size="small" v-model="form.name" @keyup.enter="addTag" />
+			<el-button v-else class="button-new-tag ml-1" size="small" @click="isInputShow = true">
+				+ 新增标签
+			</el-button>
+		</span>
+	</el-form-item>
+</el-form>
+```
+
+#### 3.2.2、封装请求
+
+创建api/admin/tag.js`文件，在其中中添加新增标签的请求：
+
+```js
+import axios from "@/utils/axios.js"
+
+/**
+ * 新增标签请求
+ * @param data 标签名称数组
+ * @returns {Promise<axios.AxiosResponse<any>>}
+ */
+export function addTags(data) {
+    return axios.post("/admin/tag/add", data)
+}
+```
+
+#### 3.2.3、在表单提交事件中发送请求
+
+最终`onSubmit`函数的内容如下：
+
+```js
+async function onSubmit() {
+  if (inputtedTags.value.length === 0) {
+    formDialogRef.value.close()
+  } else {
+    formDialogRef.value.switchLoading()
+    const tags = inputtedTags.value.map(i => i.name)
+    try {
+      const { success, message } = await addTags({ tags })
+      if (success) {
+        showMessage("添加成功")
+        formDialogRef.value.close()
+        form.name = ""
+        // 渲染表格数据，暂未封装
+      } else {
+        showMessage(message, "error")
+      }
+      formDialogRef.value.switchLoading()
+      formDialogRef.value.close()
+      inputtedTags.value = []
+    } catch(e) {
+      console.log(e)
+      formDialogRef.value.switchLoading()
+    }
+  }
+}
+```
+
