@@ -831,3 +831,332 @@ async function onSubmit() {
 }
 ```
 
+## 四、分页查询功能开发
+
+### 4.1、接口开发
+
+#### 4.1.1、设计接口模型
+
+- 请求地址：`/admin/tag/list`
+
+- 请求方法：`POST`
+
+- 请求入参：
+
+  ```json
+  {
+      "current": 1, // 页码
+      "size": 10, // 每页的数据量
+      "name": "", // 要模糊查询的标签名称
+      "startDate": "xxxx-xx-xx" // 要搜索的创建时间起始值
+      "endDate": "xxxx-xx-xx" // 要搜索的创建时间截止值
+  }
+  ```
+
+- 请求响应：
+
+  ```json
+  {
+      "success": true,
+      "message": null,
+      "code": null,
+      "data": [
+          {
+              "id": 1, // ID
+              "name": "标签名称",
+              "createTime": "xxxx-xx-xx xx:xx:xx"
+          }
+      ]
+  }
+  ```
+
+#### 4.1.2、模型转化出入参 VO
+
+**入参`VO`：**
+
+在`/model/vo/tag`包下新建入参实体类`FindTagPageListReqVO`，根据入参模型完善此类：
+
+```java
+package com.cm.weblog.admin.model.vo.tag;
+
+import com.cm.weblog.common.model.BasePageQuery;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import io.swagger.annotations.ApiModel;
+import lombok.*;
+
+import java.time.LocalDateTime;
+
+@EqualsAndHashCode(callSuper = true)
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+@ApiModel("分页查询标签接口入参")
+public class FindTagPageListReqVO extends BasePageQuery {
+    // 名称
+    private String name;
+
+    // 起始日期
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss") // 注解将"yyyy-MM-dd HH:mm:ss"这种形式的时间日期字符串解析为LocalDateTime
+    private LocalDateTime startDate;
+
+    // 截止日期
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss") // 注解将"yyyy-MM-dd HH:mm:ss"这种形式的时间日期字符串解析为LocalDateTime
+    private LocalDateTime endDate;
+}
+
+```
+
+**响应`VO`：**
+
+同样在`tag`包下新建响应实体类``，根据响应模型完善该类：
+
+```java
+package com.cm.weblog.admin.model.vo.tag;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+/**
+ * 分页查询标签接口响应实体类
+ */
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+public class FindTagPageListRspVO {
+    // 标签 ID
+    private Long id;
+    
+    // 标签名称
+    private String name;
+    
+    // 标签创建时间
+    private LocalDateTime createTime;
+}
+
+```
+
+#### 4.1.3、在业务层创建方法签名
+
+在`AdminTagService`中添加将要实现的分页查询标签的方法签名：
+
+```java
+/**
+ * 分页查询标签
+ * @param findTagPageListReqVO 查询条件
+ * @return 响应标签集合
+*/
+PageResponse<List<FindTagPageListRspVO>> findTagPageList(FindTagPageListReqVO findTagPageListReqVO);
+```
+
+#### 4.1.4、在控制层添加接口
+
+在`AdminTagController`中添加分页查询的接口，调用刚刚在业务层创建的方法：
+
+```java
+@PostMapping("tag/list")
+@ApiOperation("分页查询标签")
+@ApiOperationLog(description = "分页查询标签")
+public PageResponse<List<FindTagPageListRspVO>> findTagList(@RequestBody @Validated FindTagPageListReqVO findTagPageListReqVO) {
+	return adminTagService.findTagPageList(findTagPageListReqVO);
+}
+```
+
+#### 4.1.5、封装数据库相关操作
+
+修改位于`weblog-module-common`模块中的`TagMapper`，添加根据分页查询条件搜索数据的默认方法：
+
+```java
+package com.cm.weblog.common.domain.mapper;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cm.weblog.common.domain.dos.TagDO;
+
+import java.time.LocalDateTime;
+import java.util.Objects;
+
+public interface TagMapper extends BaseMapper<TagDO> {
+    /**
+     * 分页查询标签接口数据库查询
+     * @param current 页码
+     * @param size 每页数据量
+     * @param name 标签名称
+     * @param startDate 起始时间
+     * @param endDate 截止时间
+     * @return 标签信息
+     */
+    default Page<TagDO> selectPageList(long current, long size, String name, LocalDateTime startDate, LocalDateTime endDate) {
+        // 1、构造分页器
+        Page<TagDO> page = new Page<>(current, size);
+        
+        // 2、构建查询条件
+        LambdaQueryWrapper<TagDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper
+                // 第一个字段用于当前端并不需要查询标签名称时略过这个条件
+                .like(Objects.nonNull(name), TagDO::getName, name)
+                .ge(Objects.nonNull(startDate), TagDO::getCreateTime, startDate)
+                .le(Objects.nonNull(endDate), TagDO::getCreateTime, endDate)
+                .orderByDesc(TagDO::getCreateTime);
+        
+        // 3、执行数据库操作
+        return selectPage(page, wrapper);
+    }
+}
+
+```
+
+#### 4.1.6、业务层实现刚创建的方法签名
+
+在`impl`包下的`AdminTagServiceImpl`类中实现`findTagList`方法：
+
+```java
+ @Override
+public PageResponse<List<FindTagPageListRspVO>> findTagPageList(FindTagPageListReqVO findTagPageListReqVO) {
+	// 1、获取分页查询条件
+	Long current = findTagPageListReqVO.getCurrent();
+	Long size = findTagPageListReqVO.getSize();
+	String name = findTagPageListReqVO.getName();
+	LocalDateTime startDate = findTagPageListReqVO.getStartDate();
+	LocalDateTime endDate = findTagPageListReqVO.getEndDate();
+        
+	// 2、执行查询操作
+	Page<TagDO> page = tagMapper.selectPageList(current, size, name, startDate, endDate);
+	List<TagDO> tagDOs = page.getRecords();
+        
+	// 3、DO 转 VO
+	List<FindTagPageListRspVO> vos = Collections.emptyList();
+        
+	if (!CollectionUtils.isEmpty(tagDOs)) {
+		vos = tagDOs.stream()
+				.map(tagDO -> FindTagPageListRspVO.builder()
+					.id(tagDO.getId())
+					.name(tagDO.getName())
+					.createTime(tagDO.getCreateTime())
+					.build())
+				.collect(Collectors.toList());
+	}
+        
+	return PageResponse.success(page, vos);
+}
+```
+
+#### 4.1.7、测试
+
+重启项目，请求接口
+
+**无查询条件**
+
+入参：
+
+```json
+{
+    "current": 2,
+    "size": 10,
+    "name": "",
+    "startDate": "",
+    "endDate": ""
+}
+```
+
+响应：
+
+```json
+{
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": [
+        {
+            "id": 3,
+            "name": "voluptate Lorem sint culpa",
+            "createTime": "2025-11-06 22:16:20"
+        }
+    ],
+    "total": 11,
+    "size": 10,
+    "current": 2,
+    "pages": 2
+}
+```
+
+**带查询条件**
+
+入参：
+
+```json
+{
+    "current": 1,
+    "size": 10,
+    "name": "t",
+    "startDate": "2025-11-06 00:00:00",
+    "endDate": "2025-11-07 23:59:59"
+}
+```
+
+响应：
+
+```json
+{
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": [
+        {
+            "id": 5,
+            "name": "veniam fugiat in laboris Excepteur",
+            "createTime": "2025-11-06 22:16:57"
+        },
+        {
+            "id": 3,
+            "name": "voluptate Lorem sint culpa",
+            "createTime": "2025-11-06 22:16:20"
+        },
+        {
+            "id": 2,
+            "name": "id fugiat deserunt tempor cupidatat",
+            "createTime": "2025-11-06 22:16:20"
+        }
+    ],
+    "total": 3,
+    "size": 10,
+    "current": 1,
+    "pages": 1
+}
+```
+
+**未查询到数据**
+
+入参：
+
+```json
+{
+    "current": 3,
+    "size": 10,
+    "name": "",
+    "startDate": "",
+    "endDate": ""
+}
+```
+
+响应：
+
+```json
+{
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": [],
+    "total": 11,
+    "size": 10,
+    "current": 3,
+    "pages": 2
+}
+```
+

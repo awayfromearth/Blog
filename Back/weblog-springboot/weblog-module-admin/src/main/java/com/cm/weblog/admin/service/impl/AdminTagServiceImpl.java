@@ -1,17 +1,23 @@
 package com.cm.weblog.admin.service.impl;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.cm.weblog.admin.model.vo.tag.AddTagReqVO;
+import com.cm.weblog.admin.model.vo.tag.FindTagPageListReqVO;
+import com.cm.weblog.admin.model.vo.tag.FindTagPageListRspVO;
 import com.cm.weblog.admin.service.AdminTagService;
 import com.cm.weblog.common.domain.dos.TagDO;
 import com.cm.weblog.common.domain.mapper.TagMapper;
+import com.cm.weblog.common.utils.PageResponse;
 import com.cm.weblog.common.utils.Response;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -44,5 +50,34 @@ public class AdminTagServiceImpl extends ServiceImpl<TagMapper, TagDO> implement
         }
 
         return Response.success();
+    }
+
+    @Override
+    public PageResponse<List<FindTagPageListRspVO>> findTagPageList(FindTagPageListReqVO findTagPageListReqVO) {
+        // 1、获取分页查询条件
+        Long current = findTagPageListReqVO.getCurrent();
+        Long size = findTagPageListReqVO.getSize();
+        String name = findTagPageListReqVO.getName();
+        LocalDateTime startDate = findTagPageListReqVO.getStartDate();
+        LocalDateTime endDate = findTagPageListReqVO.getEndDate();
+
+        // 2、执行查询操作
+        Page<TagDO> page = tagMapper.selectPageList(current, size, name, startDate, endDate);
+        List<TagDO> tagDOs = page.getRecords();
+
+        // 3、DO 转 VO
+        List<FindTagPageListRspVO> vos = Collections.emptyList();
+
+        if (!CollectionUtils.isEmpty(tagDOs)) {
+            vos = tagDOs.stream()
+                    .map(tagDO -> FindTagPageListRspVO.builder()
+                            .id(tagDO.getId())
+                            .name(tagDO.getName())
+                            .createTime(tagDO.getCreateTime())
+                            .build())
+                    .collect(Collectors.toList());
+        }
+
+        return PageResponse.success(page, vos);
     }
 }
