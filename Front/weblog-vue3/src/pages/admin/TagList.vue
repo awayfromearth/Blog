@@ -4,7 +4,7 @@ import {
   ref,
   reactive
 } from "vue"
-import { addTags } from "@/api/admin/tag"
+import { addTags, getTagPageList } from "@/api/admin/tag"
 import { showMessage } from "@/utils/message"
 import { showModel } from "@/utils/model"
 import { nanoid } from "nanoid"
@@ -36,7 +36,7 @@ async function onSubmit() {
         showMessage("添加成功")
         formDialogRef.value.close()
         form.name = ""
-        // 渲染表格数据，暂未封装
+        await getTableData()
       } else {
         showMessage(message, "error")
       }
@@ -94,25 +94,25 @@ async function getTableData(p = current.value) {
   current.value = p
   isTableLoading.value = true
   try {
-    // let startDate = ""
-    // let endDate = ""
-    // if (pickedDate.value) {
-    //   startDate = moment(pickedDate.value[0]).format("YYYY-MM-DD HH:mm:ss")
-    //   endDate = moment(pickedDate.value[1]).format("YYYY-MM-DD HH:mm:ss")
-    // }
-    // const { data, current: currentPage, success, size: pageSize, total: totalCount } = await getTagPageList({
-    //   current: current.value,
-    //   size: size.value,
-    //   name: searchTagName.value,
-    //   startDate,
-    //   endDate,
-    // })
-    // if (success) {
-    //   tableData.value = data
-    //   current.value = currentPage
-    //   size.value = pageSize
-    //   total.value = totalCount
-    // }
+    let startDate = ""
+    let endDate = ""
+    if (pickedDate.value) {
+      startDate = moment(pickedDate.value[0]).format("YYYY-MM-DD HH:mm:ss")
+      endDate = moment(pickedDate.value[1]).format("YYYY-MM-DD HH:mm:ss")
+    }
+    const { data, current: currentPage, success, size: pageSize, total: totalCount } = await getTagPageList({
+      current: current.value,
+      size: size.value,
+      name: searchTagName.value,
+      startDate,
+      endDate,
+    })
+    if (success) {
+      tableData.value = data
+      current.value = currentPage
+      size.value = pageSize
+      total.value = totalCount
+    }
   } catch(e) {
     console.log(e)
   } finally {
@@ -201,7 +201,11 @@ function removeTag(i) {
 
       <!-- 分页列表 -->
       <el-table v-loading="isTableLoading" :data="tableData" border stripe style="width: 100%">
-        <el-table-column prop="name" label="分类名称" width="180" />
+        <el-table-column prop="name" label="分类名称" width="180">
+          <template #default="scope">
+            <el-tag class="ml-2" type="success">{{ scope.row.name }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="createTime" label="创建时间" width="180" />
         <el-table-column label="操作" >
           <template #default="scope">
