@@ -25,4 +25,11 @@ public interface AdminTagService {
      * @return 响应标签集合
      */
     PageResponse<List<FindTagPageListRspVO>> findTagPageList(FindTagPageListReqVO findTagPageListReqVO);
+
+    /**
+     * 删除标签
+     * @param id 标签ID
+     * @return 请求响应
+     */
+    Response<?> deleteTag(Long id);
 }

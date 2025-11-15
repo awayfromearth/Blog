@@ -1446,3 +1446,126 @@ function removeTag(i) {
 </el-table-column>
 ```
 
+## 五、删除标签功能开发
+
+### 5.1、接口开发
+
+#### 5.1.1、设计接口模型
+
+- 地址：`/admin/tag/delete`
+
+- 请求方法：`DELETE`
+
+- 入参：
+
+  ```json
+  {
+      "id": 0 // 要删除的标签ID
+  }
+  ```
+
+- 响应：
+
+  - 标签不存在：
+
+    ```json
+    {
+        "success": false,
+        "message": "该标签不存在",
+        "code": "20006",
+        "data": null
+    }
+    ```
+
+  - 成功响应：
+
+    ```json
+    {
+        "success": true,
+        "message": null,
+        "code": null,
+        "data": null
+    }
+    ```
+
+#### 5.1.2、接口模型转化相关参数
+
+补充`ResponseCodeEnum`中的异常情况：
+
+```java
+TAG_NOT_EXISTED("20006", "该标签不存在！"),
+TAG_EMPTY("20007", "标签 ID 不能为空")
+```
+
+#### 5.1.3、业务层定义方法签名
+
+在`AdminTagService`中定义删除标签的方法签名：
+
+```java
+/**
+ * 删除标签
+ * @param id 标签ID
+ * @return 请求响应
+*/
+Response<?> deleteTag(Long id);
+```
+
+#### 5.1.4、控制层添加接口
+
+向`AdminTagController`中添加删除标签的接口并调用刚才定义的方法：
+
+```java
+@DeleteMapping("tag/delete")
+@ApiOperation("删除标签")
+@ApiOperationLog(description = "删除标签接口")
+public Response<?> deleteTag(@RequestParam @NotNull(message = "标签 ID 不能为空") Long id) {
+	return adminTagService.deleteTag(id);
+}
+```
+
+#### 5.1.5、实现类中实现方法
+
+修改`AdminTagServiceImpl`的内容，调用`MybatisPlus`的删除方法，实现这个方法：
+
+```java
+@Override
+public Response<?> deleteTag(Long id) {
+	// 0 表示数据库中没有修改了的记录亦即没有匹配的标签；1表示数据库中修改了1条记录
+	int count = tagMapper.deleteById(id);
+        
+	return count > 0 ? Response.success() : Response.fail(Response.fail(ResponseCodeEnum.TAG_NOT_EXISTED);
+}
+```
+
+#### 5.1.6、测试
+
+**正常删除：**
+
+入参：`/admin/tag/delete?id=6`
+
+响应：
+
+```json
+{
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": null
+}
+```
+
+**未匹配到`ID`：**
+
+入参：`/admin/tag/delete?id=6`
+
+响应：
+
+```json
+{
+    "success": false,
+    "message": "该标签不存在！",
+    "code": "20006",
+    "data": null
+}
+```
+

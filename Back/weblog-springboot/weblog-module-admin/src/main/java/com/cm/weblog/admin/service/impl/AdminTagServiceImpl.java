@@ -8,6 +8,7 @@ import com.cm.weblog.admin.model.vo.tag.FindTagPageListRspVO;
 import com.cm.weblog.admin.service.AdminTagService;
 import com.cm.weblog.common.domain.dos.TagDO;
 import com.cm.weblog.common.domain.mapper.TagMapper;
+import com.cm.weblog.common.enums.ResponseCodeEnum;
 import com.cm.weblog.common.utils.PageResponse;
 import com.cm.weblog.common.utils.Response;
 import lombok.extern.slf4j.Slf4j;
@@ -79,5 +80,13 @@ public class AdminTagServiceImpl extends ServiceImpl<TagMapper, TagDO> implement
         }
 
         return PageResponse.success(page, vos);
+    }
+
+    @Override
+    public Response<?> deleteTag(Long id) {
+        // 0 表示数据库中没有修改了的记录亦即没有匹配的标签；1表示数据库中修改了1条记录
+        int count = tagMapper.deleteById(id);
+
+        return count > 0 ? Response.success() : Response.fail(ResponseCodeEnum.TAG_NOT_EXISTED);
     }
 }

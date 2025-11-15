@@ -14,6 +14,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.validation.constraints.NotNull;
 import java.util.List;
 
 @RestController
@@ -42,7 +43,7 @@ public class AdminCategoryController {
     @ApiOperation(value = "删除分类")
     @ApiOperationLog(description = "删除分类")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
-    public Response<?> deleteCategory(@RequestParam Long id) {
+    public Response<?> deleteCategory(@RequestParam @NotNull(message = "分类 ID 不能为空") Long id) {
         return adminCategoryService.deleteCategory(id);
     }
 }

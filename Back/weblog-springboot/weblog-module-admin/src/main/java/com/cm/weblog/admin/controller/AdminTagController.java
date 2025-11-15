@@ -11,17 +11,16 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.validation.constraints.NotNull;
 import java.util.List;
 
 @RestController
 @RequestMapping("/admin")
 @Api(tags = "Admin 标签模块")
+@Validated
 public class AdminTagController {
     @Resource
     private AdminTagService adminTagService;
@@ -39,5 +38,12 @@ public class AdminTagController {
     @ApiOperationLog(description = "分页查询标签")
     public PageResponse<List<FindTagPageListRspVO>> findTagList(@RequestBody @Validated FindTagPageListReqVO findTagPageListReqVO) {
         return adminTagService.findTagPageList(findTagPageListReqVO);
+    }
+
+    @DeleteMapping("tag/delete")
+    @ApiOperation("删除标签")
+    @ApiOperationLog(description = "删除标签接口")
+    public Response<?> deleteTag(@RequestParam("id") Long id) {
+        return adminTagService.deleteTag(id);
     }
 }
