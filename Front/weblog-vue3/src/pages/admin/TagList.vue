@@ -4,7 +4,11 @@ import {
   ref,
   reactive
 } from "vue"
-import { addTags, getTagPageList } from "@/api/admin/tag"
+import {
+  addTags,
+  getTagPageList,
+  deleteTag
+} from "@/api/admin/tag"
 import { showMessage } from "@/utils/message"
 import { showModel } from "@/utils/model"
 import { nanoid } from "nanoid"
@@ -132,16 +136,16 @@ function resetQueryParams() {
   pickedDate.value = null
 }
 
-function showDeleteCategoryConfirmModal(r) {
+function showDeleteTagConfirmModal(r) {
   showModel('是否确定要删除该标签？').then(async () => {
     try {
-      // const { success, message } = await deleteTag(r.id)
-      // if (success) {
-      //   showMessage('删除成功')
-      //   getTableData()
-      // } else {
-      //   showMessage(message, "error")
-      // }
+      const { success, message } = await deleteTag(r.id)
+      if (success) {
+        showMessage('删除成功')
+        await getTableData()
+      } else {
+        showMessage(message, "error")
+      }
     } catch(e) {
       console.log(e)
     }
@@ -209,7 +213,7 @@ function removeTag(i) {
         <el-table-column prop="createTime" label="创建时间" width="180" />
         <el-table-column label="操作" >
           <template #default="scope">
-            <el-button type="danger" size="small" @click="showDeleteCategoryConfirmModal(scope.row)">
+            <el-button type="danger" size="small" @click="showDeleteTagConfirmModal(scope.row)">
               <el-icon class="mr-1">
                 <Delete />
               </el-icon>

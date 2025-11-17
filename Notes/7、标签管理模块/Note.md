@@ -1569,3 +1569,75 @@ public Response<?> deleteTag(Long id) {
 }
 ```
 
+### 5.2、前端开发
+
+#### 5.2.1、封装请求
+
+向`api/admin/tag`中添加删除标签的请求：
+
+```js
+/**
+ * 删除标签接口
+ * @param id 标签 ID
+ * @returns {*}
+ */
+export function deleteTag(id) {
+    return axios({
+        url: "/admin/tag/delete",
+        method: "DELETE",
+        params: {
+            id
+        }
+    })
+}
+```
+
+#### 5.2.2、页面注入请求
+
+修改删除按钮绑定函数，调用删除请求：
+
+```js
+import { deleteTag } from "@/api/admin/tag"
+
+function showDeleteTagConfirmModal(r) {
+  showModel('是否确定要删除该标签？').then(async () => {
+    try {
+      const { success, message } = await deleteTag(r.id)
+      if (success) {
+        showMessage('删除成功')
+      } else {
+        showMessage(message, "error")
+      }
+    } catch(e) {
+      console.log(e)
+    }
+  }).catch(() => {
+    console.log('取消了')
+  })
+}
+```
+
+#### 5.2.3、删除之后调用查询请求
+
+在刚才的删除方法中调用查询方法：
+
+```js
+function showDeleteTagConfirmModal(r) {
+  showModel('是否确定要删除该标签？').then(async () => {
+    try {
+      const { success, message } = await deleteTag(r.id)
+      if (success) {
+        showMessage('删除成功')
+        await getTableData()
+      } else {
+        showMessage(message, "error")
+      }
+    } catch(e) {
+      console.log(e)
+    }
+  }).catch(() => {
+    console.log('取消了')
+  })
+}
+```
+

@@ -17,3 +17,18 @@ export function addTags(data) {
 export function getTagPageList(data) {
     return axios.post("admin/tag/list", data)
 }
+
+/**
+ * 删除标签接口
+ * @param id 标签 ID
+ * @returns {*}
+ */
+export function deleteTag(id) {
+    return axios({
+        url: "/admin/tag/delete",
+        method: "DELETE",
+        params: {
+            id
+        }
+    })
+}
