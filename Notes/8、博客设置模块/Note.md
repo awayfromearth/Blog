@@ -87,3 +87,35 @@ mc anonymous set public myminio/weblog
 ![](images/4.png)
 
 访问http://127.0.0.1:9000/weblog/Snipaste_2025-10-09_21-55-31.png，图片可以正常显示，上传成功
+
+## 二、文件上传接口
+
+### 2.1、添加依赖
+
+首先在父项目的`pom.xml`中添加`Minio`版本管理及声明：
+
+```xml
+<!-- 版本管理 -->
+<properties>
+	<minio.version>8.2.1</minio.version>
+</properties>
+
+<!-- 以来管理 -->
+<dependencies>
+	<dependency>
+    	<groupId>io.minio</groupId>
+        <artifactId>minio</artifactId>
+        <version>${minio.version}</version>
+    </dependency>
+</dependencies>
+```
+
+然后在`weblog-modue-admin`模块中添加该依赖：
+
+```xml
+<dependency>
+	<groupId>io.minio</groupId>
+	<artifactId>minio</artifactId>
+</dependency>
+```
+
