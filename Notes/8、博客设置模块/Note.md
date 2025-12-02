@@ -105,8 +105,8 @@ mc anonymous set public myminio/weblog
 根据需求分析，该功能共需三个接口：
 
 - 获取博客设置详情接口
-- 更新博客设置接口
 - 图片上传接口
+- 更新博客设置接口
 
 ## 三、前端静态页面搭建
 
@@ -126,8 +126,9 @@ mc anonymous set public myminio/weblog
 
 ```vue
 <script setup>
-import { reactive, ref } from "vue"
+import { reactive, ref, onMounted } from "vue"
 import { Check, Close } from "@element-plus/icons-vue"
+import { getBlogSettingDetail } from "@/api/admin/blogSetting"
 
 const formRef = ref()
 const form = reactive({
@@ -182,6 +183,39 @@ const isGithubChecked = ref(false)
 const isGiteeChecked = ref(false)
 const isZhihuChecked = ref(false)
 const isCSDNChecked = ref(false)
+
+onMounted(getBlogSettingInfo)
+
+async function getBlogSettingInfo() {
+  try {
+    const { data, success } = await getBlogSettingDetail()
+    if (success) {
+      form.name = data.name
+      form.author = data.author
+      form.introduction = data.introduction
+      form.logo = data.logo
+      form.avatar = data.avatar
+      if (data.githubHomePage) {
+        form.githubHomePage = data.githubHomePage
+        isGithubChecked.value = true
+      }
+      if (data.giteeHomepage) {
+        form.githubHomepage = data.giteeHomepage
+        isGiteeChecked.value = true
+      }
+      if (data.zhihuHomepage) {
+        form.zhihuHomepage = data.zhihuHomepage
+        isZhihuChecked.value = true
+      }
+      if (data.csdnHomepage) {
+        form.csdnHomepage = data.csdnHomepage
+        isCSDNChecked.value = true
+      }
+    }
+  } catch(e) {
+    console.log(e)
+  }
+}
 </script>
 
 <template>
@@ -198,7 +232,8 @@ const isCSDNChecked = ref(false)
           class="avatar-uploader"
           :show-file-list="false"
         >
-          <el-icon class="avatar-uploader-icon">
+          <img v-if="form.logo" :src="form.logo" alt class="avatar" />
+          <el-icon v-else class="avatar-uploader-icon">
             <Plus />
           </el-icon>
         </el-upload>
@@ -208,7 +243,8 @@ const isCSDNChecked = ref(false)
             class="avatar-uploader"
             :show-file-list="false"
         >
-          <el-icon class="avatar-uploader-icon">
+          <img v-if="form.avatar" :src="form.avatar" alt class="avatar" />
+          <el-icon v-else class="avatar-uploader-icon">
             <Plus />
           </el-icon>
         </el-upload>
@@ -217,7 +253,7 @@ const isCSDNChecked = ref(false)
         <el-input v-model="form.introduction" type="textarea" />
       </el-form-item>
       <el-form-item label="开启 GihHub 访问">
-        <el-switch v-model="isGithubChecked" inline-prompt :active-icon="Check" :inactive-icon="Close" @change="form.giteeHomepage = ''" />
+        <el-switch v-model="isGithubChecked" inline-prompt :active-icon="Check" :inactive-icon="Close" @change="form.githubHomepage = ''" />
       </el-form-item>
       <el-form-item label="GitHub 主页访问地址" v-if="isGithubChecked">
         <el-input v-model="form.githubHomepage" clearable placeholder="请输入 GitHub 主页访问的 URL" />
@@ -276,6 +312,12 @@ const isCSDNChecked = ref(false)
   width: 100px;
   height: 100px;
   text-align: center;
+}
+
+.avatar {
+  width: 100px;
+  height: 100px;
+  display: block;
 }
 </style>
 ```
@@ -375,7 +417,7 @@ public class FindBlogSettingsRspVO {
 
 <dependencyManagement>
 	<dependencies>
-    	<!-- Mapsturct 属性映射依赖 -->
+    	<!-- MapStruct 属性映射依赖 -->
         <dependency>
         	<groupId>org.mapstruct</groupId>
             <artifactId>mapstruct</artifactId>
@@ -425,12 +467,14 @@ public class FindBlogSettingsRspVO {
 
 ```xml
 <build>
-    <plugins>
-        <plugin>
-        	<groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-compiler-plugin</artifactId>
-        </plugin>
-    </plugins>
+	<pluginManagement>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+			</plugin>
+		</plugins>
+	</pluginManagement>
 </build>
 ```
 
@@ -452,19 +496,23 @@ public class FindBlogSettingsRspVO {
 package com.cm.weblog.admin.convert;
 
 import com.cm.weblog.admin.model.vo.blogSettings.FindBlogSettingsRspVO;
-import com.cm.weblog.common.domain.dos.BlogSettingsDO;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.factory.Mappers;
 
 @Mapper
 public interface BlogSettingsConvert {
     // 初始化转换器实例
     BlogSettingsConvert INSTANCE = Mappers.getMapper(BlogSettingsConvert.class);
-
-    FindBlogSettingsRspVO convertVO2DO(BlogSettingsDO blogSettingsDO);
+    
+    FindBlogSettingsRspVO convertDO2VO(BlogSettingsDO bean);
 }
 
 ```
+
+> 在`MapStruct`中不需要手动编写转换逻辑，依赖会根据这个方法签名自动生成转换的代码
+>
+> `BlogSettingsDO`这个数据库对应的实体类会在下一步中创建
 
 #### 4.1.3、创建 Controller、Service、DO&Mapper
 
@@ -479,7 +527,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/admin")
-@Api(tags = "Admin 分类模块")
+@Api(tags = "Admin 博客设置模块")
 public class AdminBlogSettingsController {
 }
 
@@ -489,8 +537,6 @@ public class AdminBlogSettingsController {
 
 ```java
 package com.cm.weblog.admin.service;
-
-import com.cm.weblog.common.utils.Response;
 
 public interface AdminBlogSettingsService {
 }
@@ -540,7 +586,9 @@ public class BlogSettingsDO {
 
 ```
 
-在`domain/mapper`包下创建`BlogSettingsMapper`接口：
+在刚才的`convert`转换接口中引入实体类
+
+然后在`domain/mapper`包下创建`BlogSettingsMapper`接口：
 
 ```java
 package com.cm.weblog.common.domain.mapper;
@@ -558,20 +606,34 @@ public interface BlogSettingsMapper extends BaseMapper<BlogSettingsDO> {
 修改`AdminBlogSettingsController`，添加查询博客设置详情的接口及`Service`：
 
 ```java
+package com.cm.weblog.admin.controller;
+
+import com.cm.weblog.admin.service.AdminBlogSettingsService;
+import com.cm.weblog.common.aspect.ApiOperationLog;
+import com.cm.weblog.common.utils.Response;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import javax.annotation.Resource;
+
 @RestController
-@RequestMapping("/admin/blog/settings")
-@Api(tags = "Admin 分类模块")
+@RequestMapping("/admin")
+@Api(tags = "Admin 博客设置模块")
 public class AdminBlogSettingsController {
     @Resource
     private AdminBlogSettingsService adminBlogSettingsService;
-
-    @PostMapping("/detail")
+    
+    @GetMapping("/blog/settings/detail")
     @ApiOperation(value = "获取博客设置详情")
     @ApiOperationLog(description = "获取博客设置详情")
     public Response<?> findBlogSettingDetail() {
-        return adminBlogSettingsService.findBlogDetail();
+        return adminBlogSettingsService.findBlogSettingDetail();
     }
 }
+
 ```
 
 #### 4.1.5、完善服务层
@@ -591,5 +653,120 @@ public interface AdminBlogSettingsService {
     Response<?> findBlogDetail();
 }
 
+```
+
+在实现类中实现这个方法：
+
+```java
+package com.cm.weblog.admin.service.impl;
+
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.cm.weblog.admin.convert.BlogSettingsConvert;
+import com.cm.weblog.admin.model.vo.blogSettings.FindBlogSettingsRspVO;
+import com.cm.weblog.admin.service.AdminBlogSettingsService;
+import com.cm.weblog.common.domain.dos.BlogSettingsDO;
+import com.cm.weblog.common.domain.mapper.BlogSettingsMapper;
+import com.cm.weblog.common.utils.Response;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
+
+@Service
+public class AdminBlogSettingsServiceImpl extends ServiceImpl<BlogSettingsMapper, BlogSettingsDO> implements AdminBlogSettingsService {
+    @Resource
+    private BlogSettingsMapper blogSettingsMapper;
+
+    @Override
+    public Response<?> findBlogSettingDetail() {
+        // 1、查询 ID 为 1 的数据
+        BlogSettingsDO blogSettingsDO = blogSettingsMapper.selectById(1L);
+        
+        // 转化为 VO
+        FindBlogSettingsRspVO vo = BlogSettingsConvert.INSTANCE.convertDO2VO(blogSettingsDO);
+        
+        return Response.success(vo);
+    }
+}
+
+```
+
+#### 4.1.6、测试
+
+请求接口`/admin/blog/settings/detail`
+
+返回：
+
+```json
+{
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": {
+        "logo": "https://img.quanxiaoha.com/quanxiaoha/f97361c0429d4bb1bc276ab835843065.jpg",
+        "name": "CM 的博客",
+        "author": "CM",
+        "introduction": "平安喜乐",
+        "avatar": "https://img.quanxiaoha.com/quanxiaoha/f97361c0429d4bb1bc276ab835843065.jpg",
+        "githubHomepage": "",
+        "csdnHomepage": "",
+        "giteeHomepage": "",
+        "zhihuHomepage": ""
+    }
+}
+```
+
+### 4.2、前端开发
+
+#### 4.2.1、封装接口
+
+在`/api/admin/blogSetting.js`中封装请求如下：
+
+```js
+import axios from "@/utils/axios"
+
+/**
+ * 获取博客设置详情请求
+ * @returns {Promise<axios.AxiosResponse<any>>}
+ */
+export function getBlogSettingDetail() {
+    return axios.get("/admin/blog/settings/detail")
+}
+```
+
+#### 4.2.2、回显表单
+
+在`BlogSetting.vue`中调用接口并回显表单：
+
+```js
+onMounted(getBlogSettingInfo)
+
+async function getBlogSettingInfo() {
+  try {
+    const { data, success } = await getBlogSettingDetail()
+    if (success) {
+      form.name = data.name
+      form.author = data.author
+      form.introduction = data.introduction
+      if (data.githubHomePage) {
+        form.githubHomePage = data.githubHomePage
+        isGithubChecked.value = true
+      }
+      if (data.giteeHomepage) {
+        form.githubHomepage = data.giteeHomepage
+        isGiteeChecked.value = true
+      }
+      if (data.zhihuHomepage) {
+        form.zhihuHomepage = data.zhihuHomepage
+        isZhihuChecked.value = true
+      }
+      if (data.csdnHomepage) {
+        form.csdnHomepage = data.csdnHomepage
+        isCSDNChecked.value = true
+      }
+    }
+  } catch(e) {
+    console.log(e)
+  }
+}
 ```
 

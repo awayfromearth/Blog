@@ -1,6 +1,7 @@
 <script setup>
-import { reactive, ref } from "vue"
+import { reactive, ref, onMounted } from "vue"
 import { Check, Close } from "@element-plus/icons-vue"
+import { getBlogSettingDetail } from "@/api/admin/blogSetting"
 
 const formRef = ref()
 const form = reactive({
@@ -55,6 +56,39 @@ const isGithubChecked = ref(false)
 const isGiteeChecked = ref(false)
 const isZhihuChecked = ref(false)
 const isCSDNChecked = ref(false)
+
+onMounted(getBlogSettingInfo)
+
+async function getBlogSettingInfo() {
+  try {
+    const { data, success } = await getBlogSettingDetail()
+    if (success) {
+      form.name = data.name
+      form.author = data.author
+      form.introduction = data.introduction
+      form.logo = data.logo
+      form.avatar = data.avatar
+      if (data.githubHomePage) {
+        form.githubHomePage = data.githubHomePage
+        isGithubChecked.value = true
+      }
+      if (data.giteeHomepage) {
+        form.githubHomepage = data.giteeHomepage
+        isGiteeChecked.value = true
+      }
+      if (data.zhihuHomepage) {
+        form.zhihuHomepage = data.zhihuHomepage
+        isZhihuChecked.value = true
+      }
+      if (data.csdnHomepage) {
+        form.csdnHomepage = data.csdnHomepage
+        isCSDNChecked.value = true
+      }
+    }
+  } catch(e) {
+    console.log(e)
+  }
+}
 </script>
 
 <template>
@@ -71,7 +105,8 @@ const isCSDNChecked = ref(false)
           class="avatar-uploader"
           :show-file-list="false"
         >
-          <el-icon class="avatar-uploader-icon">
+          <img v-if="form.logo" :src="form.logo" alt class="avatar" />
+          <el-icon v-else class="avatar-uploader-icon">
             <Plus />
           </el-icon>
         </el-upload>
@@ -81,7 +116,8 @@ const isCSDNChecked = ref(false)
             class="avatar-uploader"
             :show-file-list="false"
         >
-          <el-icon class="avatar-uploader-icon">
+          <img v-if="form.avatar" :src="form.avatar" alt class="avatar" />
+          <el-icon v-else class="avatar-uploader-icon">
             <Plus />
           </el-icon>
         </el-upload>
@@ -149,5 +185,11 @@ const isCSDNChecked = ref(false)
   width: 100px;
   height: 100px;
   text-align: center;
+}
+
+.avatar {
+  width: 100px;
+  height: 100px;
+  display: block;
 }
 </style>
