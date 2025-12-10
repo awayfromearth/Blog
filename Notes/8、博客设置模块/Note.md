@@ -770,3 +770,398 @@ async function getBlogSettingInfo() {
 }
 ```
 
+## 五、图片上传功能
+
+### 5.1、接口开发
+
+#### 5.1.1、配置 Minio
+
+**添加`Minio`依赖**
+
+首先在父项目的`pom.xml`中添加依赖管理：
+
+```xml
+<properties>
+	<!-- ... -->
+    <minio.version>8.2.1</minio.version>
+</properties>
+
+<dependency>
+	<groupId>io.minio</groupId>
+    <artifactId>minio</artifactId>
+    <version>${minio.version}</version>
+</dependency>
+```
+
+然后向`weblog-module-admin`模块添加依赖：
+
+```xml
+<!-- 对象存储 Minio -->
+<dependency>
+	<groupId>io.minio</groupId>
+    <artifactId>minio</artifactId>
+</dependency>
+```
+
+**添加`Minio`连接配置**
+
+修改`application-dev.yml`，添加`minio`连接的相关配置项：
+
+```yml
+spring:
+  datasource:
+    driver-class-name: com.p6spy.engine.spy.P6SpyDriver
+    url: jdbc:p6spy:mysql://127.0.0.1:3306/weblog?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&useSSL=false&zeroDateTimeBehavior=convertToNull
+    username: root
+    password: admin123456
+    hikari:
+      minimum-idle: 5 # 最小空闲连接数
+      maximum-pool-size: 20 # 连接池最大允许连接数
+      auto-commit: true # 自动提交事务
+      idle-timeout: 30000 # 连接闲置最长时间（超过这个时间会被释放）
+      pool-name: Weblog-HikariCP # 连接池命名
+      max-lifetime: 1800000 # 连接在连接池最大存活时间（超过这个时间会被强制关闭）
+      connection-timeout: 30000 # 连接超时时间
+      connection-test-query: SELECT 1 # 测试连接是否可用
+
+  security:
+    user:
+      name: admin
+      password: 123456
+
+# minio
+minio:
+  endPoint: http://127.0.0.1:9000
+  accessKey: minioadmin
+  secretKey: minioadmin
+  bucketName: weblog
+```
+
+**创建`Minio`配置类**
+
+在`weblog-module-admin`模块的`config`包下创建`MinioProperties`用于读取刚才`Minio`的配置：
+
+```java
+package com.cm.weblog.admin.config;
+
+import lombok.Data;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
+
+@ConfigurationProperties(prefix = "minio")
+@Component
+@Data
+public class MinioProperties {
+    private String endpoint;
+    private String accessKey;
+    private String secretKey;
+    private String bucketName;
+}
+
+```
+
+**创建`Minio`客户端配置类**
+
+继续在`config`包下创建`MinioConfig`用于配置客户端：
+
+```java
+package com.cm.weblog.admin.config;
+
+import io.minio.MinioClient;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import javax.annotation.Resource;
+
+@Configuration
+public class MinioConfig {
+    @Resource
+    private MinioProperties minioProperties;
+    
+    @Bean
+    public MinioClient minioClient() {
+        // 构建客户端
+        return MinioClient.builder()
+                .endpoint(minioProperties.getEndpoint())
+                .credentials(minioProperties.getAccessKey(), minioProperties.getSecretKey())
+                .build();
+    }
+}
+
+```
+
+**配置`Spring Boot`上传文件大小限制**
+
+修改`application.yml`限制最大文件大小为`10MB`：
+
+```yml
+spring:
+  profiles:
+    active: '@env@'
+    
+  servlet:
+    multipart:
+      max-file-size: 10MB # 限制单个文件上传最大为10MB
+      max-request-size: 10MB # 限制多文件上传时大小总和最大为10MB
+
+jwt:
+  # 签发人
+  issuer: CM
+  # 秘钥
+  secret: JUjN5GvIe/mc04kQA7I4Iy5CtroT5zUsYM29Iyu3RwYcpdh/ZcaYcJBDHrUuQINcyxuOiKX3prlNmuc7Y0868g==
+  # Token 过期时间（分钟）
+  tokenExpireTime: 1440
+  # Token 请求头 key 值
+  tokenHeaderKey: Authorization
+  # Token 值前缀
+  tokenPrefix: Bearer
+```
+
+#### 5.1.2、设计接口模型完善对应配置
+
+- 地址：`/admin/file/upload`
+
+- 请求方法：`POST`
+
+- 入参：
+
+  | 字段名 | 描述 |
+  | ------ | ---- |
+  | file   | 文件 |
+
+- 响应：
+
+  ```json
+  {
+      "success": true,
+      "message": null,
+      "code": null,
+      "data": {
+          "url": "文件的访问地址"
+      }
+  }
+  ```
+
+**创建请求响应 `VO`**
+
+在`weblog-module-admin`模块的`/model/vo`包下新增`file`包，并创建`UploadFileRspVO`实体类：
+
+```java
+package com.cm.weblog.admin.model.vo.file;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+public class UploadFileRspVO {
+    private String url;
+}
+
+```
+
+**添加文件上传失败枚举**
+
+```java
+FILE_UPLOAD_FAILED("20008", "文件上传失败")
+```
+
+**新增文件上传服务**
+
+向`weblog-module-admin`模块的`service`包中添加`AdminFileService`接口，并定义一个文件上传方法：
+
+```java
+package com.cm.weblog.admin.service;
+
+import com.cm.weblog.common.utils.Response;
+import org.springframework.web.multipart.MultipartFile;
+
+public interface AdminFileService {
+    /**
+     * 上传文件
+     * @param file 文件
+     * @return 请求响应
+     */
+    Response<?> uploadFile(MultipartFile file);
+}
+
+```
+
+**新增控制器**
+
+在`controller`包下新增`AdminFileController`控制器，并新增上传文件的接口：
+
+```java
+package com.cm.weblog.admin.controller;
+
+import com.cm.weblog.admin.service.AdminFileService;
+import com.cm.weblog.common.aspect.ApiOperationLog;
+import com.cm.weblog.common.utils.Response;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.annotation.Resource;
+
+@RestController
+@RequestMapping("/admin")
+@Api(tags = "Admin 文件模块")
+public class AdminFileController {
+    @Resource
+    private AdminFileService adminFileService;
+    
+    @PostMapping("/file/upload")
+    @ApiOperation(value = "文件上传")
+    @ApiOperationLog(description = "文件上传")
+    public Response<?> uploadFile(@RequestParam MultipartFile file) {
+        return adminFileService.uploadFile(file);
+    }
+}
+
+```
+
+> 文件是以`Form-Data`形式提交，所以要用`@RequestParam`注解
+
+#### 5.1.3、封装图片上传工具类
+
+在该模块下新建`utils`包，然后创建`MinioUtil`工具类，并添加一个处理上传文件的方法：
+
+```java
+package com.cm.weblog.admin.utils;
+
+import com.cm.weblog.admin.config.MinioProperties;
+import io.minio.MinioClient;
+import io.minio.PutObjectArgs;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.annotation.Resource;
+import java.util.UUID;
+
+@Component
+@Slf4j
+public class MinioUtil {
+    @Resource
+    private MinioProperties minioProperties;
+    
+    @Resource
+    private MinioClient minioClient;
+    
+    public String uploadFile(MultipartFile file) throws Exception {
+        // 1、判断文件是否为空
+        if (file == null || file.getSize() <= 0) {
+            log.error("==> 上传文件异常：文件为空");
+            throw new RuntimeException("文件不能为空");
+        }
+        
+        /*
+        * 2、获取文件相关信息
+        * */
+        // 原始名称
+        String fileName = file.getOriginalFilename();
+        // 类型
+        String contentType = file.getContentType();
+        
+        /*
+        * 3、生成存储信息
+        * */
+        // 名称
+        String key = UUID.randomUUID().toString().replace("-", "");
+        // 后缀
+        assert fileName != null;
+        String suffix = fileName.substring(fileName.lastIndexOf("."));
+        // 拼接
+        String objectName = String.format("%s%s", key, suffix);
+        
+        log.info("==> 文件开始上传至 Minio ，ObjectName: {}", objectName);
+        
+        /*
+        * 4、上传文件
+        * */
+        minioClient.putObject(PutObjectArgs.builder()
+                .bucket(minioProperties.getBucketName())
+                .object(objectName)
+                .stream(file.getInputStream(), file.getSize(), -1)
+                .contentType(contentType)
+                .build());
+        
+        /*
+        * 5、返回链接
+        * */
+        String url = String.format("%s%s%s", minioProperties.getEndpoint(), minioProperties.getBucketName(), objectName);
+        log.info("==> 文件上传成功，访问路径：{}", url);
+        
+        return url;
+    }
+}
+
+```
+
+#### 5.1.4、完善 Service 层服务
+
+在`impl`包下创建该接口的实现类实现`service`接口中定义的方法：
+
+```java
+package com.cm.weblog.admin.service.impl;
+
+import com.cm.weblog.admin.model.vo.file.UploadFileRspVO;
+import com.cm.weblog.admin.service.AdminFileService;
+import com.cm.weblog.admin.utils.MinioUtil;
+import com.cm.weblog.common.enums.ResponseCodeEnum;
+import com.cm.weblog.common.exception.BizException;
+import com.cm.weblog.common.utils.Response;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.annotation.Resource;
+
+@Service
+@Slf4j
+public class AdminFileServiceImpl implements AdminFileService {
+    @Resource
+    private MinioUtil minioUtil;
+    
+    @Override
+    public Response<?> uploadFile(MultipartFile file) {
+        try {
+            String url = minioUtil.uploadFile(file);
+            
+            return Response.success(UploadFileRspVO.builder().url(url).build());
+        } catch (Exception e) {
+            log.error("==> 文件上传出错：", e);
+            throw new BizException(ResponseCodeEnum.FILE_UPLOAD_FAILED);
+        }
+    }
+}
+
+```
+
+#### 5.1.5、测试
+
+重启项目，发送请求，上传图片查看结果
+
+响应：
+
+```json
+{
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": {
+        "url": "http://127.0.0.1:9000/weblog/f52d99341a284f63b2047f660ba1c8ca.png"
+    }
+}
+```
+
+打开链接，检查是否可正常访问
+

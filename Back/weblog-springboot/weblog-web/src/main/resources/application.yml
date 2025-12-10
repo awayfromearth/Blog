@@ -2,6 +2,11 @@ spring:
   profiles:
     active: '@env@'
 
+  servlet:
+    multipart:
+      max-file-size: 10MB # 限制单个文件上传最大为10MB
+      max-request-size: 10MB # 限制多文件上传时大小总和最大为10MB
+
 jwt:
   # 签发人
   issuer: CM

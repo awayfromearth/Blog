@@ -54,6 +54,7 @@
         <jjwt.version>0.11.2</jjwt.version>
         <minio.version>8.2.1</minio.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
+        <minio.version>8.2.1</minio.version>
     </properties>
 
     <!-- 统一依赖管理-->
@@ -142,18 +143,18 @@
                 <version>${jjwt.version}</version>
             </dependency>
 
-            <!-- Minio -->
-            <dependency>
-                <groupId>io.minio</groupId>
-                <artifactId>minio</artifactId>
-                <version>${minio.version}</version>
-            </dependency>
-
             <!-- MapStruct 属性映射依赖 -->
             <dependency>
                 <groupId>org.mapstruct</groupId>
                 <artifactId>mapstruct</artifactId>
                 <version>${mapstruct.version}</version>
+            </dependency>
+
+            <!-- 对象存储 Minio -->
+            <dependency>
+                <groupId>io.minio</groupId>
+                <artifactId>minio</artifactId>
+                <version>${minio.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
