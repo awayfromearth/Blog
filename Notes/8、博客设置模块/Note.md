@@ -1165,3 +1165,102 @@ public class AdminFileServiceImpl implements AdminFileService {
 
 打开链接，检查是否可正常访问
 
+### 5.2、前端开发
+
+#### 5.2.1、封装接口
+
+在`/api/admin`文件夹下新建一个`file.js`文件存放文件相关的接口：
+
+```js
+import axios from "@/utils/axios"
+
+/**
+ * 文件上传接口
+ * @param form 文件表单数据
+ * @returns {Promise<axios.AxiosResponse<any>>}
+ */
+export function uploadFile(form) {
+    return axios.post("/admin/file/upload", form)
+}
+```
+
+#### 5.2.2、LOGO 上传功能
+
+编辑`BlogSettings.vue`中的上传组件，监听`change`事件，调用接口：
+
+```vue
+<script>
+async function handleLogoChange(file) {
+  const formData = new FormData()
+  formData.append("logo", file.raw)
+  try {
+    const { success, data, message } = await getBlogSettingDetail()
+    if (success) {
+      form.logo = data.url
+      showMessage("上传成功")
+    } else {
+      showMessage(message, "error")
+    }
+  } catch (e) {
+    console.log(e)
+  }
+}
+</script>
+
+<template>
+	<el-upload
+		class="avatar-uploader"
+		action="#"
+		:show-file-list="false"
+		:on-change="handleLogoChange"
+		:auto-upload="false"
+	>
+		<img v-if="form.logo" :src="form.logo" alt class="avatar" />
+		<el-icon v-else class="avatar-uploader-icon">
+			<Plus />
+		</el-icon>
+	</el-upload>
+</template>	
+```
+
+#### 5.2.3、头像上传功能
+
+与`LOGO`类似，代码如下：
+
+```vue
+<script>
+async function handleAvatarChange(file) {
+  const formData = new FormData()
+  formData.append("file", file.raw)
+  try {
+    const { success, data, message } = await uploadFile(formData)
+    if (success) {
+      form.avatar = data.url
+      showMessage("上传成功")
+    } else {
+      showMessage(message, "error")
+    }
+  } catch (e) {
+    console.log(e)
+  }
+}
+</script>
+
+<template>
+	<el-form-item label="作者头像" prop="avatar">
+		<el-upload
+			class="avatar-uploader"
+			action="#"
+			:show-file-list="false"
+			:on-change="handleAvatarChange"
+			:auto-upload="false"
+		>
+			<img v-if="form.avatar" :src="form.avatar" alt class="avatar" />
+			<el-icon v-else class="avatar-uploader-icon">
+				<Plus />
+			</el-icon>
+		</el-upload>
+	</el-form-item>
+</template>	
+```
+

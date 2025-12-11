@@ -2,6 +2,8 @@
 import { reactive, ref, onMounted } from "vue"
 import { Check, Close } from "@element-plus/icons-vue"
 import { getBlogSettingDetail } from "@/api/admin/blogSetting"
+import { uploadFile } from "@/api/admin/file"
+import {showMessage} from "@/utils/message.js";
 
 const formRef = ref()
 const form = reactive({
@@ -89,6 +91,38 @@ async function getBlogSettingInfo() {
     console.log(e)
   }
 }
+
+async function handleLogoChange(file) {
+  const formData = new FormData()
+  formData.append("file", file.raw)
+  try {
+    const { success, data, message } = await uploadFile(formData)
+    if (success) {
+      form.logo = data.url
+      showMessage("上传成功")
+    } else {
+      showMessage(message, "error")
+    }
+  } catch (e) {
+    console.log(e)
+  }
+}
+
+async function handleAvatarChange(file) {
+  const formData = new FormData()
+  formData.append("file", file.raw)
+  try {
+    const { success, data, message } = await uploadFile(formData)
+    if (success) {
+      form.avatar = data.url
+      showMessage("上传成功")
+    } else {
+      showMessage(message, "error")
+    }
+  } catch (e) {
+    console.log(e)
+  }
+}
 </script>
 
 <template>
@@ -103,7 +137,10 @@ async function getBlogSettingInfo() {
       <el-form-item label="博客 LOGO" prop="logo">
         <el-upload
           class="avatar-uploader"
+          action="#"
           :show-file-list="false"
+          :on-change="handleLogoChange"
+          :auto-upload="false"
         >
           <img v-if="form.logo" :src="form.logo" alt class="avatar" />
           <el-icon v-else class="avatar-uploader-icon">
@@ -114,7 +151,10 @@ async function getBlogSettingInfo() {
       <el-form-item label="作者头像" prop="avatar">
         <el-upload
             class="avatar-uploader"
+            action="#"
             :show-file-list="false"
+            :on-change="handleAvatarChange"
+            :auto-upload="false"
         >
           <img v-if="form.avatar" :src="form.avatar" alt class="avatar" />
           <el-icon v-else class="avatar-uploader-icon">
