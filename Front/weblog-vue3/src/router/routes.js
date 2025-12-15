@@ -52,7 +52,7 @@ const routes = [
             },
             {
                 path: "/admin/blog/setting",
-                component: () => import("@/pages/admin/BlogSetting.vue"),
+                component: () => import("@/pages/admin/BlogSettings.vue"),
                 meta: {
                     title: "博客设置"
                 }

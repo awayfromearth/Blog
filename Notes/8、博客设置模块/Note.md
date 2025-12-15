@@ -1301,40 +1301,80 @@ async function handleAvatarChange(file) {
   }
   ```
 
-#### 6.1.2、定义博客设置 DO 与 Mapper
-
-根据博客设置的数据表，在`weblog-module-common`模块的`/domain/dos`包下，创建`BlogSettingsDO`类：
-
-```java
-```
-
-然后，在`/domain/mapper`包下创建`BlogSettingsMapper`接口：
-
-```java
-```
-
-#### 6.1.3、定义出入参 VO
+#### 6.1.2、定义出入参 VO
 
 > 根据请求模型，该接口并未响应具体数据，无需创建出参`VO`，仅需入参`VO`
 
-在`weblog-module-admin`模块的`/model/vo`包下，创建`blogsettings`包，统一存放博客设置相关的`VO`类，并创建名为`UpdateBlogSettingsReqVO`的请求入参类，根据接口模型完善此类：
+在`weblog-module-admin`模块的`/model/vo/blogsettings`包下创建名为`UpdateBlogSettingsReqVO`的请求入参类，根据接口模型完善此类：
 
 ```java
+package com.cm.weblog.admin.model.vo.blogSettings;
+
+import io.swagger.annotations.ApiModel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import javax.validation.constraints.NotBlank;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+@ApiModel(value = "博客基础信息修改 VO")
+public class UpdateBlogSettingsReqVO {
+    @NotBlank(message = "博客 LOGO 不能为空")
+    private String logo;
+    
+    @NotBlank(message = "博客名称不能为空")
+    private String name;
+    
+    @NotBlank(message = "博客作者不能为空")
+    private String author;
+    
+    @NotBlank(message = "博客介绍语不能为空")
+    private String introduction;
+    
+    @NotBlank(message = "博客头像不能为空")
+    private String avatar;
+    
+    private String githubHomepage;
+    
+    private String csdnHomepage;
+    
+    private String giteeHomepage;
+    
+    private String zhihuHomepage;
+}
+
 ```
 
-#### 6.1.4、新建服务与控制器
+#### 6.1.3、添加服务与控制器
 
-业务层新建博客设置服务接口，写入更新博客设置的方法签名：
+业务层编辑博客设置服务接口，写入更新博客设置的方法签名：
 
 ```java
+/**
+ * 修改博客设置
+ * @param updateBlogSettingsReqVO 新博客设置
+ * @return 响应请求
+*/
+Response<?> updateBlogSettings(UpdateBlogSettingsReqVO updateBlogSettingsReqVO);
 ```
 
-控制层新增博客设置控制器，写入更新博客设置的接口调用服务中定义的方法签名：
+控制层博客设置控制器中写入更新博客设置的接口调用服务中定义的方法签名：
 
 ```java
+@PostMapping("/update")
+@ApiOperation(value = "更新博客设置")
+@ApiOperationLog(description = "更新博客设置")
+public Response<?> updateBlogSettings() {
+	return adminBlogSettingsService.updateBlogSettings();
+}
 ```
 
-#### 6.1.5、实现更新博客设置的具体逻辑
+#### 6.1.4、实现更新博客设置的具体逻辑
 
 首先在业务层`impl`包下创建服务对应的实现类`AdminBlogSettingsServiceImpl`，在此类中实现更新博客设置的方法签名。
 
@@ -1345,4 +1385,93 @@ async function handleAvatarChange(file) {
 具体代码如下：
 
 ```java
+@Override
+@Transactional
+public Response<?> updateBlogSettings(UpdateBlogSettingsReqVO updateBlogSettingsReqVO) {
+    /*
+    * 1、VO 转 DO
+    * */
+    BlogSettingsDO blogSettingsDO = BlogSettingsDO.builder()
+            .id(1L)
+            .logo(updateBlogSettingsReqVO.getLogo())
+            .name(updateBlogSettingsReqVO.getName())
+            .avatar(updateBlogSettingsReqVO.getAvatar())
+            .author(updateBlogSettingsReqVO.getAuthor())
+            .introduction(updateBlogSettingsReqVO.getIntroduction())
+            .csdnHomepage(updateBlogSettingsReqVO.getCsdnHomepage())
+            .giteeHomepage(updateBlogSettingsReqVO.getGiteeHomepage())
+            .githubHomepage(updateBlogSettingsReqVO.getGithubHomepage())
+            .zhihuHomepage(updateBlogSettingsReqVO.getZhihuHomepage())
+            .build();
+
+    saveOrUpdate(blogSettingsDO);
+
+    return Response.success();
+}
 ```
+
+#### 6.1.5、测试
+
+重启项目，发送请求
+
+入参：
+
+```json
+{
+    "author": "CM test",
+    "avatar": "http://127.0.0.1:9000/weblog/6c861e22e2e04fc78ce8a17f22ffe164.png",
+    "csdnHomepage": "",
+    "giteeHomepage": "",
+    "githubHomepage": "",
+    "introduction": "平安喜乐 test",
+    "logo": "http://127.0.0.1:9000/weblog/94ea716edfdc4ad1a5d9a9d69309d2f7.png",
+    "name": "CM 的博客 test",
+    "zhihuHomepage": ""
+}
+```
+
+响应：
+
+```json
+{
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": null
+}
+```
+
+查看数据库中数据是否已经被更新
+
+### 6.2、前端开发
+
+#### 6.2.1、封装请求
+
+编辑`api/admin/blogSettings.js`文件，添加更新博客设置的请求：
+
+```js
+/**
+ * 更新博客设置接口
+ * @param data 新博客设置信息
+ * @returns {Promise<axios.AxiosResponse<any>>}
+ */
+export function updateBlogSettings(data) {
+    return axios.post("/admin/blog/settings", data)
+}
+```
+
+#### 6.2.2、保存按钮绑定事件
+
+编辑`BlogSettings.vue`页面，添加保存按钮并添加点击事件，发送更新博客请求：
+
+```vue
+<script></script>
+
+<template>
+  <el-form>
+    <!-- 省略 -->
+    <el-button type="primary" :loading="isSubmitting" @click="saveBlogSettings">保存</el-button>
+  </el-form>
+</template>
+```
+

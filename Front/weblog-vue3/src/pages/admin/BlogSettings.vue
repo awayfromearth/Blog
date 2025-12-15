@@ -1,9 +1,9 @@
 <script setup>
 import { reactive, ref, onMounted } from "vue"
 import { Check, Close } from "@element-plus/icons-vue"
-import { getBlogSettingDetail } from "@/api/admin/blogSetting"
+import { getBlogSettingDetail, updateBlogSettings } from "@/api/admin/blogSettings.js"
 import { uploadFile } from "@/api/admin/file"
-import {showMessage} from "@/utils/message.js";
+import { showMessage } from "@/utils/message.js"
 
 const formRef = ref()
 const form = reactive({
@@ -12,7 +12,7 @@ const form = reactive({
   logo: "",
   avatar: "",
   introduction: "",
-  githubHomePage: "",
+  githubHomepage: "",
   giteeHomepage: "",
   zhihuHomepage: "",
   csdnHomepage: "",
@@ -70,8 +70,8 @@ async function getBlogSettingInfo() {
       form.introduction = data.introduction
       form.logo = data.logo
       form.avatar = data.avatar
-      if (data.githubHomePage) {
-        form.githubHomePage = data.githubHomePage
+      if (data.githubHomepage) {
+        form.githubHomepage = data.githubHomepage
         isGithubChecked.value = true
       }
       if (data.giteeHomepage) {
@@ -122,6 +122,26 @@ async function handleAvatarChange(file) {
   } catch (e) {
     console.log(e)
   }
+}
+
+const isSubmitting = ref(false)
+function saveBlogSettings() {
+  formRef.value.validate(async (valid) => {
+    if (valid) {
+      isSubmitting.value = true
+      try {
+        const { success, message } = await updateBlogSettings(form)
+        if (!success) {
+          return showMessage(message, "error")
+        }
+
+        await getBlogSettingInfo()
+        showMessage("保存成功")
+      } finally {
+        isSubmitting.value = false
+      }
+    }
+  })
 }
 </script>
 
@@ -189,6 +209,7 @@ async function handleAvatarChange(file) {
       <el-form-item label="CSDN 主页访问地址" v-if="isCSDNChecked">
         <el-input v-model="form.csdnHomepage" clearable placeholder="请输入 CSDN 主页访问的 URL" />
       </el-form-item>
+      <el-button type="primary" :loading="isSubmitting" @click="saveBlogSettings">保存</el-button>
     </el-form>
   </el-card>
 </template>

@@ -1,8 +1,10 @@
 package com.cm.weblog.admin.convert;
 
 import com.cm.weblog.admin.model.vo.blogSettings.FindBlogSettingsRspVO;
+import com.cm.weblog.admin.model.vo.blogSettings.UpdateBlogSettingsReqVO;
 import com.cm.weblog.common.domain.dos.BlogSettingsDO;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.factory.Mappers;
 
 @Mapper
@@ -11,7 +13,7 @@ public interface BlogSettingsConvert {
     BlogSettingsConvert INSTANCE = Mappers.getMapper(BlogSettingsConvert.class);
 
     /**
-     * DO 转 VO
+     * 博客设置：DO 转 VO
      * @param bean DO
      * @return VO
      */
