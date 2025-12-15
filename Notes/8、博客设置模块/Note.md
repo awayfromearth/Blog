@@ -1465,7 +1465,27 @@ export function updateBlogSettings(data) {
 编辑`BlogSettings.vue`页面，添加保存按钮并添加点击事件，发送更新博客请求：
 
 ```vue
-<script></script>
+<script>
+const isSubmitting = ref(false)
+function saveBlogSettings() {
+  formRef.value.validate(async (valid) => {
+    if (valid) {
+      isSubmitting.value = true
+      try {
+        const { success, message } = await updateBlogSettings(form)
+        if (!success) {
+          return showMessage(message, "error")
+        }
+
+        await getBlogSettingInfo()
+        showMessage("保存成功")
+      } finally {
+        isSubmitting.value = false
+      }
+    }
+  })
+}
+</script>
 
 <template>
   <el-form>
