@@ -1264,3 +1264,85 @@ async function handleAvatarChange(file) {
 </template>	
 ```
 
+## 六、更新博客设置功能开发
+
+### 6.1、接口开发
+
+#### 6.1.1、设计接口模型
+
+- 请求地址：`/admin/blog/settings/update`
+
+- 请求方法：`POST`
+
+- 入参：
+
+  ```json
+  {
+    "author": "", // 作者
+    "avatar": "", // 作者头像
+    "introduction": "", // 介绍语
+    "logo": "", // 博客 LOGO
+    "name": "", // 博客名称
+    "csdnHomepage": "", // csdn 主页地址
+    "giteeHomepage": "", // gitee 主页地址
+    "githubHomepage": "", // github 主页地址
+    "zhihuHomepage": "" // 知乎主页地址
+  }
+  ```
+
+- 响应：
+
+  ```json
+  {
+    "success": true,
+    "message": null,
+    "code": null,
+    "data": null
+  }
+  ```
+
+#### 6.1.2、定义博客设置 DO 与 Mapper
+
+根据博客设置的数据表，在`weblog-module-common`模块的`/domain/dos`包下，创建`BlogSettingsDO`类：
+
+```java
+```
+
+然后，在`/domain/mapper`包下创建`BlogSettingsMapper`接口：
+
+```java
+```
+
+#### 6.1.3、定义出入参 VO
+
+> 根据请求模型，该接口并未响应具体数据，无需创建出参`VO`，仅需入参`VO`
+
+在`weblog-module-admin`模块的`/model/vo`包下，创建`blogsettings`包，统一存放博客设置相关的`VO`类，并创建名为`UpdateBlogSettingsReqVO`的请求入参类，根据接口模型完善此类：
+
+```java
+```
+
+#### 6.1.4、新建服务与控制器
+
+业务层新建博客设置服务接口，写入更新博客设置的方法签名：
+
+```java
+```
+
+控制层新增博客设置控制器，写入更新博客设置的接口调用服务中定义的方法签名：
+
+```java
+```
+
+#### 6.1.5、实现更新博客设置的具体逻辑
+
+首先在业务层`impl`包下创建服务对应的实现类`AdminBlogSettingsServiceImpl`，在此类中实现更新博客设置的方法签名。
+
+> 1. 将接收到的入参`VO`转换成`DO`
+> 2. 执行`Mapper`中的保存或更新方法
+> 3. 返回响应结果
+
+具体代码如下：
+
+```java
+```
