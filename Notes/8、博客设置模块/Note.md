@@ -1369,8 +1369,8 @@ Response<?> updateBlogSettings(UpdateBlogSettingsReqVO updateBlogSettingsReqVO);
 @PostMapping("/update")
 @ApiOperation(value = "更新博客设置")
 @ApiOperationLog(description = "更新博客设置")
-public Response<?> updateBlogSettings() {
-	return adminBlogSettingsService.updateBlogSettings();
+public Response<?> updateBlogSettings(@RequestBody @Validated UpdateBlogSettingsReqVO updateBlogSettingsReqVO) {
+	return adminBlogSettingsService.updateBlogSettings(updateBlogSettingsReqVO);
 }
 ```
 
