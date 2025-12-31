@@ -39,6 +39,8 @@
 
 ### 1.3、表设计
 
+#### 1.3.1、文章表
+
 分析完接口后，可设计此模块所需的表。因为为存储的文章内容数据文本较大且只有访问文章详情的时候才需要查询，将表拆分为两张，一张存储文章基础信息，一张存储文章内容以文章`id`作关联
 
 文章基础信息表需要字段如下：
@@ -87,3 +89,32 @@ CREATE TABLE `t_article_content` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 ROW_FORMAT=DYNAMIC COMMENT='文章内容表';
 ```
 
+#### 1.3.2、文章关联关系表
+
+文章发布时还需选择文章归属的分类，每篇文章选择一个分类，因此还需建立文章与类别的关联表：
+
+```sql
+CREATE TABLE `t_article_category_rel` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `article_id` bigint(20) unsigned NOT NULL COMMENT '文章id',
+  `category_id` bigint(20) unsigned NOT NULL COMMENT '分类id',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uni_article_id` (`article_id`) USING BTREE,
+  KEY `idx_category_id` (`category_id`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 ROW_FORMAT=DYNAMIC COMMENT='文章所属分类关联表';
+```
+
+> 因为原型页中，一个文章只能归属于一个分类，所以，这里对其添加了`UNIQUE KEY`唯一索引。
+
+此外，每篇文章可以绑定多个标签，因此还需建立一个文章与标签的关联表：
+
+```sql
+CREATE TABLE `t_article_tag_rel` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT 'id',
+  `article_id` bigint(20) unsigned NOT NULL COMMENT '文章id',
+  `tag_id` bigint(20) unsigned NOT NULL COMMENT '标签id',
+  PRIMARY KEY (`id`) USING BTREE,
+  KEY `idx_article_id` (`article_id`) USING BTREE,
+  KEY `idx_tag_id` (`tag_id`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 ROW_FORMAT=DYNAMIC COMMENT='文章对应标签关联表';
+```
