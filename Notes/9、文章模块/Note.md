@@ -355,6 +355,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 @TableName("t_article_content")
 public class ArticleContentDO {
     @TableId(type = IdType.AUTO)
