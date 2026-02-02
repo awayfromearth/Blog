@@ -119,7 +119,7 @@ CREATE TABLE `t_article_tag_rel` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 ROW_FORMAT=DYNAMIC COMMENT='文章对应标签关联表';
 ```
 
-## 二、文章发布接口开发
+## 二、文章发布接口开发(1)：基础接口
 
 ### 2.1、接口模型设计
 
